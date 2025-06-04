@@ -147,21 +147,24 @@ public final class EntityDeathListener extends Queue implements Listener {
                 Player player = (Player) attacker;
                 e = player.getName();
             }
-            else if (attacker instanceof AbstractArrow) {
-                AbstractArrow arrow = (AbstractArrow) attacker;
-                ProjectileSource shooter = arrow.getShooter();
+            else if (attacker instanceof AbstractArrow arrow) {
+                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                    ProjectileSource shooter = arrow.getShooter();
 
-                if (shooter instanceof Player) {
-                    Player player = (Player) shooter;
-                    e = player.getName();
-                }
-                else if (shooter instanceof LivingEntity) {
-                    EntityType entityType = ((LivingEntity) shooter).getType();
-                    if (entityType != null) { // Check for MyPet plugin
-                        String name = entityType.name().toLowerCase(Locale.ROOT);
-                        e = "#" + name;
+                    if (shooter instanceof Player player) {
+                        logEntityDeath(entity, player.getName());
+                    } else if (shooter instanceof LivingEntity livingShooter) {
+                        EntityType entityType = livingShooter.getType();
+                        if (entityType != null) { // Check for MyPet plugin
+                            logEntityDeath(entity, "#" + entityType.name().toLowerCase(Locale.ROOT));
+                        } else {
+                            logEntityDeath(entity, "#unknown");
+                        }
+                    } else {
+                        logEntityDeath(entity, "#unknown");
                     }
-                }
+                }, arrow);
+                return;
             }
             else if (attacker instanceof ThrownPotion) {
                 ThrownPotion potion = (ThrownPotion) attacker;
