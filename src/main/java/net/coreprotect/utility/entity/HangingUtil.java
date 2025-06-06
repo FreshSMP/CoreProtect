@@ -133,7 +133,7 @@ public class HangingUtil {
                     catch (Exception e) {
                     }
                     if (hanging != null) {
-                        hanging.teleport(block.getWorld().getBlockAt(paintingX, paintingY, paintingZ).getLocation());
+                        hanging.teleportAsync(block.getWorld().getBlockAt(paintingX, paintingY, paintingZ).getLocation());
                         hanging.setFacingDirection(faceSet, true);
                         hanging.setArt(painting, true);
                     }
@@ -148,7 +148,7 @@ public class HangingUtil {
                         Entity entity = block.getWorld().spawn(spawnBlock.getLocation(), itemFrame);
                         if (entity instanceof ItemFrame) {
                             ItemFrame hanging = (ItemFrame) entity;
-                            hanging.teleport(block.getWorld().getBlockAt(x, y, z).getLocation());
+                            hanging.teleportAsync(block.getWorld().getBlockAt(x, y, z).getLocation());
                             hanging.setFacingDirection(faceSet, true);
 
                             Material type = MaterialUtils.getType(rowData);
