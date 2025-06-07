@@ -319,10 +319,21 @@ public class Queue {
     }
 
     protected static void queuePlayerKill(String user, Location location, String player) {
-        int currentConsumer = Consumer.currentConsumer;
-        int consumerId = Consumer.newConsumerId(currentConsumer);
-        addConsumer(currentConsumer, new Object[] { consumerId, Process.PLAYER_KILL, null, 0, null, 0, 0, null });
-        queueStandardData(consumerId, currentConsumer, new String[] { user, null }, new Object[] { location.getBlock().getState(), player });
+        Scheduler.runTask(CoreProtect.getInstance(), () -> {
+            try {
+                BlockState state = location.getBlock().getState();
+
+                int currentConsumer = Consumer.currentConsumer;
+                int consumerId = Consumer.newConsumerId(currentConsumer);
+                addConsumer(currentConsumer, new Object[] {
+                    consumerId, Process.PLAYER_KILL, null, 0, null, 0, 0, null
+                });
+                queueStandardData(consumerId, currentConsumer, new String[] { user, null }, new Object[] { state, player });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, location);
     }
 
     protected static void queuePlayerLogin(Player player, int time, int configSessions, int configUsernames) {
