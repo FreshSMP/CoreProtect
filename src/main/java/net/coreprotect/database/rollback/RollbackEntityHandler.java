@@ -1,5 +1,7 @@
 package net.coreprotect.database.rollback;
 
+import net.coreprotect.CoreProtect;
+import net.coreprotect.thread.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -79,13 +81,15 @@ public class RollbackEntityHandler {
                     // Attempt to remove entity
                     if (rowRolledBack == 1) {
                         boolean removed = false;
-                        int entityId = -1;
+                        int entityId;
                         String entityName = EntityUtils.getEntityType(oldTypeRaw).name();
                         String token = "" + rowX + "." + rowY + "." + rowZ + "." + rowWorldId + "." + entityName + "";
                         Object[] cachedEntity = CacheHandler.entityCache.get(token);
 
                         if (cachedEntity != null) {
                             entityId = (Integer) cachedEntity[1];
+                        } else {
+                            entityId = -1;
                         }
 
                         int xmin = rowX - 5;
@@ -95,32 +99,31 @@ public class RollbackEntityHandler {
                         int zmin = rowZ - 5;
                         int zmax = rowZ + 5;
 
-                        for (Entity entity : block.getChunk().getEntities()) {
-                            if (entityId > -1) {
-                                int id = entity.getEntityId();
-                                if (id == entityId) {
-                                    updateEntityCount(finalUserString, 1);
-                                    removed = true;
-                                    entity.remove();
-                                    break;
-                                }
+                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                    for (Entity entity : block.getChunk().getEntities()) {
+                        if (entityId > -1) {
+                            int id = entity.getEntityId();
+                            if (id == entityId) {
+                                updateEntityCount(finalUserString, 1);
+                                entity.remove();
+                                return;
                             }
-                            else {
-                                if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
-                                    Location entityLocation = entity.getLocation();
-                                    int entityx = entityLocation.getBlockX();
-                                    int entityY = entityLocation.getBlockY();
-                                    int entityZ = entityLocation.getBlockZ();
+                        } else {
+                            if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
+                                Location entityLocation = entity.getLocation();
+                                int entityx = entityLocation.getBlockX();
+                                int entityY = entityLocation.getBlockY();
+                                int entityZ = entityLocation.getBlockZ();
 
-                                    if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
-                                        updateEntityCount(finalUserString, 1);
-                                        removed = true;
-                                        entity.remove();
-                                        break;
-                                    }
+                                if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
+                                    updateEntityCount(finalUserString, 1);
+                                    entity.remove();
+                                    return;
                                 }
                             }
                         }
+                    }
+                }, block.getLocation());
 
                         if (!removed && entityId > -1) {
                             for (Entity entity : block.getWorld().getLivingEntities()) {
