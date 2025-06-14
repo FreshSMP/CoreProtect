@@ -126,15 +126,16 @@ public class RollbackEntityHandler {
                 }, block.getLocation());
 
                         if (!removed && entityId > -1) {
-                            for (Entity entity : block.getWorld().getLivingEntities()) {
-                                int id = entity.getEntityId();
-                                if (id == entityId) {
-                                    updateEntityCount(finalUserString, 1);
-                                    removed = true;
-                                    entity.remove();
-                                    break;
+                            Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                                for (Entity entity : block.getWorld().getLivingEntities()) {
+                                    if (entity.getEntityId() == entityId) {
+                                        updateEntityCount(finalUserString, 1);
+                                        entity.remove();
+                                        break;
+                                    }
                                 }
-                            }
+                            }, block.getLocation());
+                            removed = true;
                         }
 
                         if (removed) {
