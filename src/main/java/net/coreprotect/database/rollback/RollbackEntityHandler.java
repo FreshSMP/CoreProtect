@@ -99,42 +99,41 @@ public class RollbackEntityHandler {
                         int zmin = rowZ - 5;
                         int zmax = rowZ + 5;
 
-                Scheduler.runTask(CoreProtect.getInstance(), () -> {
                     for (Entity entity : block.getChunk().getEntities()) {
-                        if (entityId > -1) {
-                            int id = entity.getEntityId();
-                            if (id == entityId) {
-                                updateEntityCount(finalUserString, 1);
-                                entity.remove();
-                                return;
-                            }
-                        } else {
-                            if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
-                                Location entityLocation = entity.getLocation();
-                                int entityx = entityLocation.getBlockX();
-                                int entityY = entityLocation.getBlockY();
-                                int entityZ = entityLocation.getBlockZ();
-
-                                if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
+                        Location entityLocation = entity.getLocation();
+                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                            if (entityId > -1) {
+                                int id = entity.getEntityId();
+                                if (id == entityId) {
                                     updateEntityCount(finalUserString, 1);
                                     entity.remove();
-                                    return;
                                 }
-                            }
-                        }
-                    }
-                }, block.getLocation());
+                            } else {
+                                if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
+                                    int entityx = entityLocation.getBlockX();
+                                    int entityY = entityLocation.getBlockY();
+                                    int entityZ = entityLocation.getBlockZ();
 
-                        if (!removed && entityId > -1) {
-                            Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                                for (Entity entity : block.getWorld().getLivingEntities()) {
-                                    if (entity.getEntityId() == entityId) {
+                                    if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
                                         updateEntityCount(finalUserString, 1);
                                         entity.remove();
-                                        break;
                                     }
                                 }
-                            }, block.getLocation());
+                            }
+                        }, entityLocation);
+                    }
+
+                        if (!removed && entityId > -1) {
+                            for (Entity entity : block.getWorld().getLivingEntities()) {
+                                if (entity.getEntityId() == entityId) {
+                                    Location entityLocation = entity.getLocation();
+                                    Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                                        updateEntityCount(finalUserString, 1);
+                                        entity.remove();
+                                    }, entityLocation);
+                                    break;
+                                }
+                            }
                             removed = true;
                         }
 
