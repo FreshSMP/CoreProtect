@@ -1,7 +1,6 @@
 package net.coreprotect.database.rollback;
 
 import net.coreprotect.CoreProtect;
-import net.coreprotect.thread.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -100,16 +99,15 @@ public class RollbackEntityHandler {
                         int zmax = rowZ + 5;
 
                     for (Entity entity : block.getChunk().getEntities()) {
-                        Location entityLocation = entity.getLocation();
-                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                        entity.getScheduler().run(CoreProtect.getInstance(), scheduledTask -> {
                             if (entityId > -1) {
-                                int id = entity.getEntityId();
-                                if (id == entityId) {
+                                if (entity.getEntityId() == entityId) {
                                     updateEntityCount(finalUserString, 1);
                                     entity.remove();
                                 }
                             } else {
                                 if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
+                                    Location entityLocation = entity.getLocation();
                                     int entityx = entityLocation.getBlockX();
                                     int entityY = entityLocation.getBlockY();
                                     int entityZ = entityLocation.getBlockZ();
@@ -120,17 +118,16 @@ public class RollbackEntityHandler {
                                     }
                                 }
                             }
-                        }, entityLocation);
+                        }, null);
                     }
 
                         if (!removed && entityId > -1) {
                             for (Entity entity : block.getWorld().getLivingEntities()) {
                                 if (entity.getEntityId() == entityId) {
-                                    Location entityLocation = entity.getLocation();
-                                    Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                                    entity.getScheduler().run(CoreProtect.getInstance(), scheduledTask -> {
                                         updateEntityCount(finalUserString, 1);
                                         entity.remove();
-                                    }, entityLocation);
+                                    }, null);
                                     break;
                                 }
                             }
