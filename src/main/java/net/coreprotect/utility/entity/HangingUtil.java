@@ -2,6 +2,8 @@ package net.coreprotect.utility.entity;
 
 import java.util.Locale;
 
+import net.coreprotect.CoreProtect;
+import net.coreprotect.thread.Scheduler;
 import org.bukkit.Art;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -9,7 +11,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.Hanging;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Painting;
 import org.bukkit.inventory.ItemStack;
@@ -43,16 +44,18 @@ public class HangingUtil {
                 }
             }
 
-            for (Entity e : block.getChunk().getEntities()) {
-                if ((BukkitAdapter.ADAPTER.isItemFrame(rowType) && e instanceof ItemFrame) || (rowType.equals(Material.PAINTING) && e instanceof Painting)) {
-                    Location el = e.getLocation();
-                    if (el.getBlockX() == x && el.getBlockY() == y && el.getBlockZ() == z) {
-                        if (hangingFace == null || ((Hanging) e).getFacing() == hangingFace) {
-                            e.remove();
-                            break;
+            for (Entity entity : block.getChunk().getEntities()) {
+                BlockFace finalHangingFace = hangingFace;
+                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                    if ((BukkitAdapter.ADAPTER.isItemFrame(rowType) && entity instanceof ItemFrame) || (rowType.equals(Material.PAINTING) && entity instanceof Painting)) {
+                        Location el = entity.getLocation();
+                        if (el.getBlockX() == x && el.getBlockY() == y && el.getBlockZ() == z) {
+                            if (finalHangingFace == null || entity.getFacing() == finalHangingFace) {
+                                entity.remove();
+                            }
                         }
                     }
-                }
+                }, entity);
             }
 
             BlockFace faceSet = null;
@@ -180,15 +183,18 @@ public class HangingUtil {
                 }
             }
 
-            for (Entity e : block.getChunk().getEntities()) {
-                if (e instanceof ItemFrame || e instanceof Painting) {
-                    Location el = e.getLocation();
-                    if (el.getBlockX() == block.getX() && el.getBlockY() == block.getY() && el.getBlockZ() == block.getZ()) {
-                        if (hangingFace == null || ((Hanging) e).getFacing() == hangingFace) {
-                            e.remove();
+            for (Entity entity : block.getChunk().getEntities()) {
+                BlockFace finalHangingFace = hangingFace;
+                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                    if (entity instanceof ItemFrame || entity instanceof Painting) {
+                        Location el = entity.getLocation();
+                        if (el.getBlockX() == block.getX() && el.getBlockY() == block.getY() && el.getBlockZ() == block.getZ()) {
+                            if (finalHangingFace == null || entity.getFacing() == finalHangingFace) {
+                                entity.remove();
+                            }
                         }
                     }
-                }
+                }, entity);
             }
         }
         catch (Exception e) {

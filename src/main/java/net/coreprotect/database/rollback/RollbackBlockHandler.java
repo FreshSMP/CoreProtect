@@ -142,13 +142,16 @@ public class RollbackBlockHandler extends Queue {
                     BlockUtils.prepareTypeAndData(chunkChanges, block, rowType, blockData, true);
                     return countBlock;
                 }
-                else if ((rowType == Material.AIR) && ((oldTypeMaterial == Material.END_CRYSTAL))) {
+                else if ((rowType == Material.AIR) && (oldTypeMaterial == Material.END_CRYSTAL)) {
                     for (Entity entity : block.getChunk().getEntities()) {
-                        if (entity instanceof EnderCrystal) {
-                            if (entity.getLocation().getBlockX() == rowX && entity.getLocation().getBlockY() == rowY && entity.getLocation().getBlockZ() == rowZ) {
-                                Scheduler.runTask(CoreProtect.getInstance(), entity::remove, entity);
+                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                            if (entity instanceof EnderCrystal) {
+                                Location location = entity.getLocation();
+                                if (location.getBlockX() == rowX && location.getBlockY() == rowY && location.getBlockZ() == rowZ) {
+                                    entity.remove();
+                                }
                             }
-                        }
+                        }, entity);
                     }
                 }
                 else if (rollbackType == 0 && rowAction == 0 && (rowType == Material.AIR)) {
