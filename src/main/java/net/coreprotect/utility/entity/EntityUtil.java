@@ -85,516 +85,523 @@ public class EntityUtil {
                     return;
                 }
 
-                @SuppressWarnings("unchecked")
-                List<Object> age = (List<Object>) list.get(0);
-                @SuppressWarnings("unchecked")
-                List<Object> tame = (List<Object>) list.get(1);
-                @SuppressWarnings("unchecked")
-                List<Object> data = (List<Object>) list.get(2);
+                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        List<Object> age = (List<Object>) list.get(0);
+                        @SuppressWarnings("unchecked")
+                        List<Object> tame = (List<Object>) list.get(1);
+                        @SuppressWarnings("unchecked")
+                        List<Object> data = (List<Object>) list.get(2);
 
-                if (list.size() >= 5) {
-                    entity.setCustomNameVisible((Boolean) list.get(3));
-                    entity.setCustomName((String) list.get(4));
-                }
-
-                int unixtimestamp = (int) (System.currentTimeMillis() / 1000L);
-                int wid = WorldUtils.getWorldId(block.getWorld().getName());
-                String token = "" + block.getX() + "." + block.getY() + "." + block.getZ() + "." + wid + "." + type.name() + "";
-                CacheHandler.entityCache.put(token, new Object[] { unixtimestamp, entity.getEntityId() });
-
-                if (entity instanceof Ageable) {
-                    int count = 0;
-                    Ageable ageable = (Ageable) entity;
-                    for (Object value : age) {
-                        if (count == 0) {
-                            int set = (Integer) value;
-                            ageable.setAge(set);
+                        if (list.size() >= 5) {
+                            entity.setCustomNameVisible((Boolean) list.get(3));
+                            entity.setCustomName((String) list.get(4));
                         }
-                        else if (count == 1) {
-                            boolean set = (Boolean) value;
-                            ageable.setAgeLock(set);
-                        }
-                        else if (count == 2) {
-                            boolean set = (Boolean) value;
-                            if (set) {
-                                ageable.setAdult();
+
+                        int unixtimestamp = (int) (System.currentTimeMillis() / 1000L);
+                        int wid = WorldUtils.getWorldId(block.getWorld().getName());
+                        String token = "" + block.getX() + "." + block.getY() + "." + block.getZ() + "." + wid + "." + type.name() + "";
+                        CacheHandler.entityCache.put(token, new Object[] { unixtimestamp, entity.getEntityId() });
+
+                        if (entity instanceof Ageable) {
+                            int count = 0;
+                            Ageable ageable = (Ageable) entity;
+                            for (Object value : age) {
+                                if (count == 0) {
+                                    int set = (Integer) value;
+                                    ageable.setAge(set);
+                                }
+                                else if (count == 1) {
+                                    boolean set = (Boolean) value;
+                                    ageable.setAgeLock(set);
+                                }
+                                else if (count == 2) {
+                                    boolean set = (Boolean) value;
+                                    if (set) {
+                                        ageable.setAdult();
+                                    }
+                                    else {
+                                        ageable.setBaby();
+                                    }
+                                }
+                                else if (count == 3) {
+                                    boolean set = (Boolean) value;
+                                    ageable.setBreed(set);
+                                }
+                                else if (count == 4 && value != null) {
+                                    // deprecated
+                                    double set = (Double) value;
+                                    ageable.setMaxHealth(set);
+                                }
+                                count++;
                             }
-                            else {
-                                ageable.setBaby();
+                        }
+                        if (entity instanceof Tameable) {
+                            int count = 0;
+                            Tameable tameable = (Tameable) entity;
+                            for (Object value : tame) {
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    tameable.setTamed(set);
+                                }
+                                else if (count == 1) {
+                                    String set = (String) value;
+                                    if (set.length() > 0) {
+                                        Player owner = Bukkit.getServer().getPlayer(set);
+                                        if (owner == null) {
+                                            OfflinePlayer offlinePlayer = Bukkit.getServer().getOfflinePlayer(set);
+                                            if (offlinePlayer != null) {
+                                                tameable.setOwner(offlinePlayer);
+                                            }
+                                        }
+                                        else {
+                                            tameable.setOwner(owner);
+                                        }
+                                    }
+                                }
+                                count++;
                             }
                         }
-                        else if (count == 3) {
-                            boolean set = (Boolean) value;
-                            ageable.setBreed(set);
+                        if (entity instanceof Attributable && list.size() >= 6) {
+                            Attributable attributable = (Attributable) entity;
+                            @SuppressWarnings("unchecked")
+                            List<Object> attributes = (List<Object>) list.get(5);
+                            for (Object value : attributes) {
+                                @SuppressWarnings("unchecked")
+                                List<Object> attributeData = (List<Object>) value;
+                                Attribute attribute = null;
+                                if (attributeData.get(0) instanceof Attribute) {
+                                    attribute = (Attribute) attributeData.get(0);
+                                }
+                                else {
+                                    attribute = (Attribute) BukkitAdapter.ADAPTER.getRegistryValue((String) attributeData.get(0), Attribute.class);
+                                }
+                                Double baseValue = (Double) attributeData.get(1);
+                                @SuppressWarnings("unchecked")
+                                List<Object> attributeModifiers = (List<Object>) attributeData.get(2);
+
+                                AttributeInstance entityAttribute = attributable.getAttribute(attribute);
+                                if (entityAttribute != null) {
+                                    entityAttribute.setBaseValue(baseValue);
+                                    for (AttributeModifier modifier : entityAttribute.getModifiers()) {
+                                        entityAttribute.removeModifier(modifier);
+                                    }
+                                    for (Object modifier : attributeModifiers) {
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> serializedModifier = (Map<String, Object>) modifier;
+                                        entityAttribute.addModifier(AttributeModifier.deserialize(serializedModifier));
+                                    }
+                                }
+                            }
                         }
-                        else if (count == 4 && value != null) {
-                            // deprecated
-                            double set = (Double) value;
-                            ageable.setMaxHealth(set);
+
+                        if (entity instanceof LivingEntity && list.size() >= 7) {
+                            LivingEntity livingEntity = (LivingEntity) entity;
+                            @SuppressWarnings("unchecked")
+                            List<Object> details = (List<Object>) list.get(6);
+                            int count = 0;
+                            for (Object value : details) {
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    livingEntity.setRemoveWhenFarAway(set);
+                                }
+                                else if (count == 1) {
+                                    boolean set = (Boolean) value;
+                                    livingEntity.setCanPickupItems(set);
+                                }
+                                count++;
+                            }
                         }
-                        count++;
-                    }
-                }
-                if (entity instanceof Tameable) {
-                    int count = 0;
-                    Tameable tameable = (Tameable) entity;
-                    for (Object value : tame) {
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            tameable.setTamed(set);
-                        }
-                        else if (count == 1) {
-                            String set = (String) value;
-                            if (set.length() > 0) {
-                                Player owner = Bukkit.getServer().getPlayer(set);
-                                if (owner == null) {
-                                    OfflinePlayer offlinePlayer = Bukkit.getServer().getOfflinePlayer(set);
-                                    if (offlinePlayer != null) {
-                                        tameable.setOwner(offlinePlayer);
+
+                        int count = 0;
+                        for (Object value : data) {
+                            if (entity instanceof Creeper) {
+                                Creeper creeper = (Creeper) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    creeper.setPowered(set);
+                                }
+                            }
+                            else if (entity instanceof Enderman) {
+                                Enderman enderman = (Enderman) entity;
+                                if (count == 1) {
+                                    String blockDataString = (String) value;
+                                    BlockData blockData = Bukkit.getServer().createBlockData(blockDataString);
+                                    enderman.setCarriedBlock(blockData);
+                                }
+                            }
+                            else if (entity instanceof IronGolem) {
+                                IronGolem irongolem = (IronGolem) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    irongolem.setPlayerCreated(set);
+                                }
+                            }
+                            else if (entity instanceof Cat) {
+                                Cat cat = (Cat) entity;
+                                if (count == 0) {
+                                    if (value instanceof String) {
+                                        value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Cat.Type.class);
+                                    }
+                                    Cat.Type set = (Cat.Type) value;
+                                    cat.setCatType(set);
+                                }
+                                else if (count == 1) {
+                                    DyeColor set = (DyeColor) value;
+                                    cat.setCollarColor(set);
+                                }
+                                else if (count == 2) {
+                                    boolean set = (Boolean) value;
+                                    cat.setSitting(set);
+                                }
+                            }
+                            else if (entity instanceof Fox) {
+                                Fox fox = (Fox) entity;
+                                if (count == 0) {
+                                    Fox.Type set = (Fox.Type) value;
+                                    fox.setFoxType(set);
+                                }
+                                else if (count == 1) {
+                                    boolean set = (Boolean) value;
+                                    fox.setSitting(set);
+                                }
+                            }
+                            else if (entity instanceof Panda) {
+                                Panda panda = (Panda) entity;
+                                if (count == 0) {
+                                    Gene set = (Gene) value;
+                                    panda.setMainGene(set);
+                                }
+                                else if (count == 1) {
+                                    Gene set = (Gene) value;
+                                    panda.setHiddenGene(set);
+                                }
+                            }
+                            else if (entity instanceof Pig) {
+                                Pig pig = (Pig) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    pig.setSaddle(set);
+                                }
+                            }
+                            else if (entity instanceof Sheep) {
+                                Sheep sheep = (Sheep) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    sheep.setSheared(set);
+                                }
+                                else if (count == 1) {
+                                    DyeColor set = (DyeColor) value;
+                                    sheep.setColor(set);
+                                }
+                            }
+                            else if (entity instanceof MushroomCow) {
+                                MushroomCow mushroomCow = (MushroomCow) entity;
+                                if (count == 0) {
+                                    MushroomCow.Variant set = (MushroomCow.Variant) value;
+                                    mushroomCow.setVariant(set);
+                                }
+                            }
+                            else if (entity instanceof Slime) {
+                                Slime slime = (Slime) entity;
+                                if (count == 0) {
+                                    int set = (Integer) value;
+                                    slime.setSize(set);
+                                }
+                            }
+                            else if (entity instanceof Parrot) {
+                                Parrot parrot = (Parrot) entity;
+                                if (count == 0) {
+                                    Variant set = (Variant) value;
+                                    parrot.setVariant(set);
+                                }
+                            }
+                            else if (entity instanceof TropicalFish) {
+                                TropicalFish tropicalFish = (TropicalFish) entity;
+                                if (count == 0) {
+                                    DyeColor set = (DyeColor) value;
+                                    tropicalFish.setBodyColor(set);
+                                }
+                                else if (count == 1) {
+                                    TropicalFish.Pattern set = (TropicalFish.Pattern) value;
+                                    tropicalFish.setPattern(set);
+                                }
+                                else if (count == 2) {
+                                    DyeColor set = (DyeColor) value;
+                                    tropicalFish.setPatternColor(set);
+                                }
+                            }
+                            else if (entity instanceof Phantom) {
+                                Phantom phantom = (Phantom) entity;
+                                if (count == 0) {
+                                    int set = (Integer) value;
+                                    phantom.setSize(set);
+                                }
+                            }
+                            else if (entity instanceof AbstractVillager) {
+                                AbstractVillager abstractVillager = (AbstractVillager) entity;
+                                if (count == 0) {
+                                    if (abstractVillager instanceof Villager) {
+                                        Villager villager = (Villager) abstractVillager;
+                                        if (value instanceof String) {
+                                            value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Profession.class);
+                                        }
+                                        Profession set = (Profession) value;
+                                        villager.setProfession(set);
+                                    }
+                                }
+                                else if (count == 1) {
+                                    if (abstractVillager instanceof Villager && (value instanceof Villager.Type || value instanceof String)) {
+                                        Villager villager = (Villager) abstractVillager;
+                                        if (value instanceof String) {
+                                            value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Villager.Type.class);
+                                        }
+                                        Villager.Type set = (Villager.Type) value;
+                                        villager.setVillagerType(set);
+                                    }
+                                }
+                                else if (count == 2) {
+                                    List<MerchantRecipe> merchantRecipes = new ArrayList<>();
+                                    @SuppressWarnings("unchecked")
+                                    List<Object> set = (List<Object>) value;
+                                    for (Object recipes : set) {
+                                        @SuppressWarnings("unchecked")
+                                        List<Object> recipe = (List<Object>) recipes;
+                                        @SuppressWarnings("unchecked")
+                                        List<Object> itemMap = (List<Object>) recipe.get(0);
+                                        @SuppressWarnings("unchecked")
+                                        ItemStack result = ItemStack.deserialize((Map<String, Object>) itemMap.get(0));
+                                        @SuppressWarnings("unchecked")
+                                        List<List<Map<String, Object>>> metadata = (List<List<Map<String, Object>>>) itemMap.get(1);
+                                        Object[] populatedStack = Rollback.populateItemStack(result, metadata);
+                                        result = (ItemStack) populatedStack[2];
+                                        int uses = (int) recipe.get(1);
+                                        int maxUses = (int) recipe.get(2);
+                                        boolean experienceReward = (boolean) recipe.get(3);
+                                        List<ItemStack> merchantIngredients = new ArrayList<>();
+                                        @SuppressWarnings("unchecked")
+                                        List<Object> ingredients = (List<Object>) recipe.get(4);
+                                        for (Object ingredient : ingredients) {
+                                            @SuppressWarnings("unchecked")
+                                            List<Object> ingredientMap = (List<Object>) ingredient;
+                                            @SuppressWarnings("unchecked")
+                                            ItemStack item = ItemStack.deserialize((Map<String, Object>) ingredientMap.get(0));
+                                            @SuppressWarnings("unchecked")
+                                            List<List<Map<String, Object>>> itemMetaData = (List<List<Map<String, Object>>>) ingredientMap.get(1);
+                                            populatedStack = Rollback.populateItemStack(item, itemMetaData);
+                                            item = (ItemStack) populatedStack[2];
+                                            merchantIngredients.add(item);
+                                        }
+                                        MerchantRecipe merchantRecipe = new MerchantRecipe(result, uses, maxUses, experienceReward);
+                                        if (recipe.size() > 6) {
+                                            int villagerExperience = (int) recipe.get(5);
+                                            float priceMultiplier = (float) recipe.get(6);
+                                            merchantRecipe = new MerchantRecipe(result, uses, maxUses, experienceReward, villagerExperience, priceMultiplier);
+                                        }
+                                        merchantRecipe.setIngredients(merchantIngredients);
+                                        merchantRecipes.add(merchantRecipe);
+                                    }
+                                    if (!merchantRecipes.isEmpty()) {
+                                        abstractVillager.setRecipes(merchantRecipes);
                                     }
                                 }
                                 else {
-                                    tameable.setOwner(owner);
-                                }
-                            }
-                        }
-                        count++;
-                    }
-                }
-                if (entity instanceof Attributable && list.size() >= 6) {
-                    Attributable attributable = (Attributable) entity;
-                    @SuppressWarnings("unchecked")
-                    List<Object> attributes = (List<Object>) list.get(5);
-                    for (Object value : attributes) {
-                        @SuppressWarnings("unchecked")
-                        List<Object> attributeData = (List<Object>) value;
-                        Attribute attribute = null;
-                        if (attributeData.get(0) instanceof Attribute) {
-                            attribute = (Attribute) attributeData.get(0);
-                        }
-                        else {
-                            attribute = (Attribute) BukkitAdapter.ADAPTER.getRegistryValue((String) attributeData.get(0), Attribute.class);
-                        }
-                        Double baseValue = (Double) attributeData.get(1);
-                        @SuppressWarnings("unchecked")
-                        List<Object> attributeModifiers = (List<Object>) attributeData.get(2);
+                                    Villager villager = (Villager) abstractVillager;
 
-                        AttributeInstance entityAttribute = attributable.getAttribute(attribute);
-                        if (entityAttribute != null) {
-                            entityAttribute.setBaseValue(baseValue);
-                            for (AttributeModifier modifier : entityAttribute.getModifiers()) {
-                                entityAttribute.removeModifier(modifier);
-                            }
-                            for (Object modifier : attributeModifiers) {
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> serializedModifier = (Map<String, Object>) modifier;
-                                entityAttribute.addModifier(AttributeModifier.deserialize(serializedModifier));
-                            }
-                        }
-                    }
-                }
-
-                if (entity instanceof LivingEntity && list.size() >= 7) {
-                    LivingEntity livingEntity = (LivingEntity) entity;
-                    @SuppressWarnings("unchecked")
-                    List<Object> details = (List<Object>) list.get(6);
-                    int count = 0;
-                    for (Object value : details) {
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            livingEntity.setRemoveWhenFarAway(set);
-                        }
-                        else if (count == 1) {
-                            boolean set = (Boolean) value;
-                            livingEntity.setCanPickupItems(set);
-                        }
-                        count++;
-                    }
-                }
-
-                int count = 0;
-                for (Object value : data) {
-                    if (entity instanceof Creeper) {
-                        Creeper creeper = (Creeper) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            creeper.setPowered(set);
-                        }
-                    }
-                    else if (entity instanceof Enderman) {
-                        Enderman enderman = (Enderman) entity;
-                        if (count == 1) {
-                            String blockDataString = (String) value;
-                            BlockData blockData = Bukkit.getServer().createBlockData(blockDataString);
-                            enderman.setCarriedBlock(blockData);
-                        }
-                    }
-                    else if (entity instanceof IronGolem) {
-                        IronGolem irongolem = (IronGolem) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            irongolem.setPlayerCreated(set);
-                        }
-                    }
-                    else if (entity instanceof Cat) {
-                        Cat cat = (Cat) entity;
-                        if (count == 0) {
-                            if (value instanceof String) {
-                                value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Cat.Type.class);
-                            }
-                            Cat.Type set = (Cat.Type) value;
-                            cat.setCatType(set);
-                        }
-                        else if (count == 1) {
-                            DyeColor set = (DyeColor) value;
-                            cat.setCollarColor(set);
-                        }
-                        else if (count == 2) {
-                            boolean set = (Boolean) value;
-                            cat.setSitting(set);
-                        }
-                    }
-                    else if (entity instanceof Fox) {
-                        Fox fox = (Fox) entity;
-                        if (count == 0) {
-                            Fox.Type set = (Fox.Type) value;
-                            fox.setFoxType(set);
-                        }
-                        else if (count == 1) {
-                            boolean set = (Boolean) value;
-                            fox.setSitting(set);
-                        }
-                    }
-                    else if (entity instanceof Panda) {
-                        Panda panda = (Panda) entity;
-                        if (count == 0) {
-                            Gene set = (Gene) value;
-                            panda.setMainGene(set);
-                        }
-                        else if (count == 1) {
-                            Gene set = (Gene) value;
-                            panda.setHiddenGene(set);
-                        }
-                    }
-                    else if (entity instanceof Pig) {
-                        Pig pig = (Pig) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            pig.setSaddle(set);
-                        }
-                    }
-                    else if (entity instanceof Sheep) {
-                        Sheep sheep = (Sheep) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            sheep.setSheared(set);
-                        }
-                        else if (count == 1) {
-                            DyeColor set = (DyeColor) value;
-                            sheep.setColor(set);
-                        }
-                    }
-                    else if (entity instanceof MushroomCow) {
-                        MushroomCow mushroomCow = (MushroomCow) entity;
-                        if (count == 0) {
-                            MushroomCow.Variant set = (MushroomCow.Variant) value;
-                            mushroomCow.setVariant(set);
-                        }
-                    }
-                    else if (entity instanceof Slime) {
-                        Slime slime = (Slime) entity;
-                        if (count == 0) {
-                            int set = (Integer) value;
-                            slime.setSize(set);
-                        }
-                    }
-                    else if (entity instanceof Parrot) {
-                        Parrot parrot = (Parrot) entity;
-                        if (count == 0) {
-                            Variant set = (Variant) value;
-                            parrot.setVariant(set);
-                        }
-                    }
-                    else if (entity instanceof TropicalFish) {
-                        TropicalFish tropicalFish = (TropicalFish) entity;
-                        if (count == 0) {
-                            DyeColor set = (DyeColor) value;
-                            tropicalFish.setBodyColor(set);
-                        }
-                        else if (count == 1) {
-                            TropicalFish.Pattern set = (TropicalFish.Pattern) value;
-                            tropicalFish.setPattern(set);
-                        }
-                        else if (count == 2) {
-                            DyeColor set = (DyeColor) value;
-                            tropicalFish.setPatternColor(set);
-                        }
-                    }
-                    else if (entity instanceof Phantom) {
-                        Phantom phantom = (Phantom) entity;
-                        if (count == 0) {
-                            int set = (Integer) value;
-                            phantom.setSize(set);
-                        }
-                    }
-                    else if (entity instanceof AbstractVillager) {
-                        AbstractVillager abstractVillager = (AbstractVillager) entity;
-                        if (count == 0) {
-                            if (abstractVillager instanceof Villager) {
-                                Villager villager = (Villager) abstractVillager;
-                                if (value instanceof String) {
-                                    value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Profession.class);
-                                }
-                                Profession set = (Profession) value;
-                                villager.setProfession(set);
-                            }
-                        }
-                        else if (count == 1) {
-                            if (abstractVillager instanceof Villager && (value instanceof Villager.Type || value instanceof String)) {
-                                Villager villager = (Villager) abstractVillager;
-                                if (value instanceof String) {
-                                    value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Villager.Type.class);
-                                }
-                                Villager.Type set = (Villager.Type) value;
-                                villager.setVillagerType(set);
-                            }
-                        }
-                        else if (count == 2) {
-                            List<MerchantRecipe> merchantRecipes = new ArrayList<>();
-                            @SuppressWarnings("unchecked")
-                            List<Object> set = (List<Object>) value;
-                            for (Object recipes : set) {
-                                @SuppressWarnings("unchecked")
-                                List<Object> recipe = (List<Object>) recipes;
-                                @SuppressWarnings("unchecked")
-                                List<Object> itemMap = (List<Object>) recipe.get(0);
-                                @SuppressWarnings("unchecked")
-                                ItemStack result = ItemStack.deserialize((Map<String, Object>) itemMap.get(0));
-                                @SuppressWarnings("unchecked")
-                                List<List<Map<String, Object>>> metadata = (List<List<Map<String, Object>>>) itemMap.get(1);
-                                Object[] populatedStack = Rollback.populateItemStack(result, metadata);
-                                result = (ItemStack) populatedStack[2];
-                                int uses = (int) recipe.get(1);
-                                int maxUses = (int) recipe.get(2);
-                                boolean experienceReward = (boolean) recipe.get(3);
-                                List<ItemStack> merchantIngredients = new ArrayList<>();
-                                @SuppressWarnings("unchecked")
-                                List<Object> ingredients = (List<Object>) recipe.get(4);
-                                for (Object ingredient : ingredients) {
-                                    @SuppressWarnings("unchecked")
-                                    List<Object> ingredientMap = (List<Object>) ingredient;
-                                    @SuppressWarnings("unchecked")
-                                    ItemStack item = ItemStack.deserialize((Map<String, Object>) ingredientMap.get(0));
-                                    @SuppressWarnings("unchecked")
-                                    List<List<Map<String, Object>>> itemMetaData = (List<List<Map<String, Object>>>) ingredientMap.get(1);
-                                    populatedStack = Rollback.populateItemStack(item, itemMetaData);
-                                    item = (ItemStack) populatedStack[2];
-                                    merchantIngredients.add(item);
-                                }
-                                MerchantRecipe merchantRecipe = new MerchantRecipe(result, uses, maxUses, experienceReward);
-                                if (recipe.size() > 6) {
-                                    int villagerExperience = (int) recipe.get(5);
-                                    float priceMultiplier = (float) recipe.get(6);
-                                    merchantRecipe = new MerchantRecipe(result, uses, maxUses, experienceReward, villagerExperience, priceMultiplier);
-                                }
-                                merchantRecipe.setIngredients(merchantIngredients);
-                                merchantRecipes.add(merchantRecipe);
-                            }
-                            if (!merchantRecipes.isEmpty()) {
-                                abstractVillager.setRecipes(merchantRecipes);
-                            }
-                        }
-                        else {
-                            Villager villager = (Villager) abstractVillager;
-
-                            if (count == 3) {
-                                int set = (int) value;
-                                villager.setVillagerLevel(set);
-                            }
-                            else if (count == 4) {
-                                int set = (int) value;
-                                villager.setVillagerExperience(set);
-                            }
-                        }
-                    }
-                    else if (entity instanceof Raider) {
-                        Raider raider = (Raider) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            raider.setPatrolLeader(set);
-                        }
-
-                        if (entity instanceof Spellcaster && count == 1) {
-                            Spellcaster spellcaster = (Spellcaster) entity;
-                            Spell set = (Spell) value;
-                            spellcaster.setSpell(set);
-                        }
-                    }
-                    else if (entity instanceof Wolf) {
-                        Wolf wolf = (Wolf) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            wolf.setSitting(set);
-                        }
-                        else if (count == 1) {
-                            DyeColor set = (DyeColor) value;
-                            wolf.setCollarColor(set);
-                        }
-                        else if (count == 2) {
-                            BukkitAdapter.ADAPTER.setWolfVariant(wolf, value);
-                        }
-                    }
-                    else if (entity instanceof ZombieVillager) {
-                        ZombieVillager zombieVillager = (ZombieVillager) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            zombieVillager.setBaby(set);
-                        }
-                        else if (count == 1) {
-                            if (value instanceof String) {
-                                value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Profession.class);
-                            }
-                            Profession set = (Profession) value;
-                            zombieVillager.setVillagerProfession(set);
-                        }
-                    }
-                    else if (entity instanceof Zombie) {
-                        Zombie zombie = (Zombie) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            zombie.setBaby(set);
-                        }
-                    }
-                    else if (entity instanceof AbstractHorse) {
-                        AbstractHorse abstractHorse = (AbstractHorse) entity;
-                        if (count == 0 && value != null) {
-                            // deprecated
-                            boolean set = (Boolean) value;
-                            if (entity instanceof ChestedHorse) {
-                                ChestedHorse chestedHorse = (ChestedHorse) entity;
-                                chestedHorse.setCarryingChest(set);
-                            }
-                        }
-                        else if (count == 1 && value != null) {
-                            // deprecated
-                            org.bukkit.entity.Horse.Color set = (org.bukkit.entity.Horse.Color) value;
-                            if (entity instanceof Horse) {
-                                Horse horse = (Horse) entity;
-                                horse.setColor(set);
-                            }
-                        }
-                        else if (count == 2) {
-                            int set = (Integer) value;
-                            abstractHorse.setDomestication(set);
-                        }
-                        else if (count == 3) {
-                            double set = (Double) value;
-                            abstractHorse.setJumpStrength(set);
-                        }
-                        else if (count == 4) {
-                            int set = (Integer) value;
-                            abstractHorse.setMaxDomestication(set);
-                        }
-                        else if (count == 5 && value != null) {
-                            // deprecated
-                            Style set = (Style) value;
-                            Horse horse = (Horse) entity;
-                            horse.setStyle(set);
-                        }
-                        if (entity instanceof Horse) {
-                            Horse horse = (Horse) entity;
-                            if (count == 8) {
-                                if (value != null) {
-                                    @SuppressWarnings("unchecked")
-                                    ItemStack set = ItemStack.deserialize((Map<String, Object>) value);
-                                    horse.getInventory().setSaddle(set);
-                                }
-                            }
-                            else if (count == 9) {
-                                org.bukkit.entity.Horse.Color set = (org.bukkit.entity.Horse.Color) value;
-                                horse.setColor(set);
-                            }
-                            else if (count == 10) {
-                                Style set = (Style) value;
-                                horse.setStyle(set);
-                            }
-                            else if (count == 11) {
-                                if (value != null) {
-                                    @SuppressWarnings("unchecked")
-                                    ItemStack set = ItemStack.deserialize((Map<String, Object>) value);
-                                    horse.getInventory().setArmor(set);
-                                }
-                            }
-                            else if (count == 12 && value != null) {
-                                @SuppressWarnings("unchecked")
-                                org.bukkit.Color set = org.bukkit.Color.deserialize((Map<String, Object>) value);
-                                ItemStack armor = horse.getInventory().getArmor();
-                                if (armor != null) {
-                                    ItemMeta itemMeta = armor.getItemMeta();
-                                    if (itemMeta instanceof LeatherArmorMeta) {
-                                        LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) itemMeta;
-                                        leatherArmorMeta.setColor(set);
-                                        armor.setItemMeta(leatherArmorMeta);
+                                    if (count == 3) {
+                                        int set = (int) value;
+                                        villager.setVillagerLevel(set);
+                                    }
+                                    else if (count == 4) {
+                                        int set = (int) value;
+                                        villager.setVillagerExperience(set);
                                     }
                                 }
                             }
-                        }
-                        else if (entity instanceof ChestedHorse) {
-                            if (count == 7) {
-                                ChestedHorse chestedHorse = (ChestedHorse) entity;
-                                boolean set = (Boolean) value;
-                                chestedHorse.setCarryingChest(set);
+                            else if (entity instanceof Raider) {
+                                Raider raider = (Raider) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    raider.setPatrolLeader(set);
+                                }
+
+                                if (entity instanceof Spellcaster && count == 1) {
+                                    Spellcaster spellcaster = (Spellcaster) entity;
+                                    Spell set = (Spell) value;
+                                    spellcaster.setSpell(set);
+                                }
                             }
-                            if (entity instanceof Llama) {
-                                Llama llama = (Llama) entity;
-                                if (count == 8) {
-                                    if (value != null) {
+                            else if (entity instanceof Wolf) {
+                                Wolf wolf = (Wolf) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    wolf.setSitting(set);
+                                }
+                                else if (count == 1) {
+                                    DyeColor set = (DyeColor) value;
+                                    wolf.setCollarColor(set);
+                                }
+                                else if (count == 2) {
+                                    BukkitAdapter.ADAPTER.setWolfVariant(wolf, value);
+                                }
+                            }
+                            else if (entity instanceof ZombieVillager) {
+                                ZombieVillager zombieVillager = (ZombieVillager) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    zombieVillager.setBaby(set);
+                                }
+                                else if (count == 1) {
+                                    if (value instanceof String) {
+                                        value = BukkitAdapter.ADAPTER.getRegistryValue((String) value, Profession.class);
+                                    }
+                                    Profession set = (Profession) value;
+                                    zombieVillager.setVillagerProfession(set);
+                                }
+                            }
+                            else if (entity instanceof Zombie) {
+                                Zombie zombie = (Zombie) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    zombie.setBaby(set);
+                                }
+                            }
+                            else if (entity instanceof AbstractHorse) {
+                                AbstractHorse abstractHorse = (AbstractHorse) entity;
+                                if (count == 0 && value != null) {
+                                    // deprecated
+                                    boolean set = (Boolean) value;
+                                    if (entity instanceof ChestedHorse) {
+                                        ChestedHorse chestedHorse = (ChestedHorse) entity;
+                                        chestedHorse.setCarryingChest(set);
+                                    }
+                                }
+                                else if (count == 1 && value != null) {
+                                    // deprecated
+                                    org.bukkit.entity.Horse.Color set = (org.bukkit.entity.Horse.Color) value;
+                                    if (entity instanceof Horse) {
+                                        Horse horse = (Horse) entity;
+                                        horse.setColor(set);
+                                    }
+                                }
+                                else if (count == 2) {
+                                    int set = (Integer) value;
+                                    abstractHorse.setDomestication(set);
+                                }
+                                else if (count == 3) {
+                                    double set = (Double) value;
+                                    abstractHorse.setJumpStrength(set);
+                                }
+                                else if (count == 4) {
+                                    int set = (Integer) value;
+                                    abstractHorse.setMaxDomestication(set);
+                                }
+                                else if (count == 5 && value != null) {
+                                    // deprecated
+                                    Style set = (Style) value;
+                                    Horse horse = (Horse) entity;
+                                    horse.setStyle(set);
+                                }
+                                if (entity instanceof Horse) {
+                                    Horse horse = (Horse) entity;
+                                    if (count == 8) {
+                                        if (value != null) {
+                                            @SuppressWarnings("unchecked")
+                                            ItemStack set = ItemStack.deserialize((Map<String, Object>) value);
+                                            horse.getInventory().setSaddle(set);
+                                        }
+                                    }
+                                    else if (count == 9) {
+                                        org.bukkit.entity.Horse.Color set = (org.bukkit.entity.Horse.Color) value;
+                                        horse.setColor(set);
+                                    }
+                                    else if (count == 10) {
+                                        Style set = (Style) value;
+                                        horse.setStyle(set);
+                                    }
+                                    else if (count == 11) {
+                                        if (value != null) {
+                                            @SuppressWarnings("unchecked")
+                                            ItemStack set = ItemStack.deserialize((Map<String, Object>) value);
+                                            horse.getInventory().setArmor(set);
+                                        }
+                                    }
+                                    else if (count == 12 && value != null) {
                                         @SuppressWarnings("unchecked")
-                                        ItemStack set = ItemStack.deserialize((Map<String, Object>) value);
-                                        llama.getInventory().setDecor(set);
+                                        org.bukkit.Color set = org.bukkit.Color.deserialize((Map<String, Object>) value);
+                                        ItemStack armor = horse.getInventory().getArmor();
+                                        if (armor != null) {
+                                            ItemMeta itemMeta = armor.getItemMeta();
+                                            if (itemMeta instanceof LeatherArmorMeta) {
+                                                LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) itemMeta;
+                                                leatherArmorMeta.setColor(set);
+                                                armor.setItemMeta(leatherArmorMeta);
+                                            }
+                                        }
                                     }
                                 }
-                                else if (count == 9) {
-                                    Llama.Color set = (Llama.Color) value;
-                                    llama.setColor(set);
+                                else if (entity instanceof ChestedHorse) {
+                                    if (count == 7) {
+                                        ChestedHorse chestedHorse = (ChestedHorse) entity;
+                                        boolean set = (Boolean) value;
+                                        chestedHorse.setCarryingChest(set);
+                                    }
+                                    if (entity instanceof Llama) {
+                                        Llama llama = (Llama) entity;
+                                        if (count == 8) {
+                                            if (value != null) {
+                                                @SuppressWarnings("unchecked")
+                                                ItemStack set = ItemStack.deserialize((Map<String, Object>) value);
+                                                llama.getInventory().setDecor(set);
+                                            }
+                                        }
+                                        else if (count == 9) {
+                                            Llama.Color set = (Llama.Color) value;
+                                            llama.setColor(set);
+                                        }
+                                    }
                                 }
                             }
+                            else if (entity instanceof Bee) {
+                                Bee bee = (Bee) entity;
+                                if (count == 0) {
+                                    int set = (int) value;
+                                    bee.setAnger(set);
+                                }
+                                else if (count == 1) {
+                                    boolean set = (Boolean) value;
+                                    bee.setHasNectar(set);
+                                }
+                                else if (count == 2) {
+                                    boolean set = (Boolean) value;
+                                    bee.setHasStung(set);
+                                }
+                            }
+                            else if (entity instanceof Piglin) {
+                                Piglin piglin = (Piglin) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    piglin.setBaby(set);
+                                }
+                            }
+                            else if (entity instanceof Zoglin) {
+                                Zoglin zoglin = (Zoglin) entity;
+                                if (count == 0) {
+                                    boolean set = (Boolean) value;
+                                    zoglin.setBaby(set);
+                                }
+                            }
+                            else {
+                                BukkitAdapter.ADAPTER.setEntityMeta(entity, value, count);
+                            }
+                            count++;
                         }
                     }
-                    else if (entity instanceof Bee) {
-                        Bee bee = (Bee) entity;
-                        if (count == 0) {
-                            int set = (int) value;
-                            bee.setAnger(set);
-                        }
-                        else if (count == 1) {
-                            boolean set = (Boolean) value;
-                            bee.setHasNectar(set);
-                        }
-                        else if (count == 2) {
-                            boolean set = (Boolean) value;
-                            bee.setHasStung(set);
-                        }
+                    catch (Exception e) {
+                        e.printStackTrace();
                     }
-                    else if (entity instanceof Piglin) {
-                        Piglin piglin = (Piglin) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            piglin.setBaby(set);
-                        }
-                    }
-                    else if (entity instanceof Zoglin) {
-                        Zoglin zoglin = (Zoglin) entity;
-                        if (count == 0) {
-                            boolean set = (Boolean) value;
-                            zoglin.setBaby(set);
-                        }
-                    }
-                    else {
-                        BukkitAdapter.ADAPTER.setEntityMeta(entity, value, count);
-                    }
-                    count++;
-                }
+                }, entity);
             }
             catch (Exception e) {
                 e.printStackTrace();

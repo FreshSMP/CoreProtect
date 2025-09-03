@@ -1,6 +1,7 @@
 package net.coreprotect.database.rollback;
 
 import net.coreprotect.CoreProtect;
+import net.coreprotect.thread.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -98,36 +99,36 @@ public class RollbackEntityHandler {
                         int zmin = rowZ - 5;
                         int zmax = rowZ + 5;
 
-                    for (Entity entity : block.getChunk().getEntities()) {
-                        entity.getScheduler().run(CoreProtect.getInstance(), scheduledTask -> {
-                            if (entityId > -1) {
-                                if (entity.getEntityId() == entityId) {
-                                    updateEntityCount(finalUserString, 1);
-                                    entity.remove();
-                                }
-                            } else {
-                                if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
-                                    Location entityLocation = entity.getLocation();
-                                    int entityx = entityLocation.getBlockX();
-                                    int entityY = entityLocation.getBlockY();
-                                    int entityZ = entityLocation.getBlockZ();
-
-                                    if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
+                        for (Entity entity : block.getChunk().getEntities()) {
+                            Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                                if (entityId > -1) {
+                                    if (entity.getEntityId() == entityId) {
                                         updateEntityCount(finalUserString, 1);
                                         entity.remove();
                                     }
+                                } else {
+                                    if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
+                                        Location entityLocation = entity.getLocation();
+                                        int entityx = entityLocation.getBlockX();
+                                        int entityY = entityLocation.getBlockY();
+                                        int entityZ = entityLocation.getBlockZ();
+
+                                        if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
+                                            updateEntityCount(finalUserString, 1);
+                                            entity.remove();
+                                        }
+                                    }
                                 }
-                            }
-                        }, null);
-                    }
+                            }, entity);
+                        }
 
                         if (!removed && entityId > -1) {
                             for (Entity entity : block.getWorld().getLivingEntities()) {
                                 if (entity.getEntityId() == entityId) {
-                                    entity.getScheduler().run(CoreProtect.getInstance(), scheduledTask -> {
+                                    Scheduler.runTask(CoreProtect.getInstance(), () -> {
                                         updateEntityCount(finalUserString, 1);
                                         entity.remove();
-                                    }, null);
+                                    }, entity);
                                     break;
                                 }
                             }
@@ -184,7 +185,7 @@ public class RollbackEntityHandler {
 
     /**
      * Spawns an entity at the given block location.
-     * 
+     *
      * @param user
      *            The username of the player
      * @param block

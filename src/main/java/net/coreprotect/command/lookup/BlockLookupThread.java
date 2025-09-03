@@ -59,7 +59,7 @@ public class BlockLookupThread implements Runnable {
                     }
                 }
                 else {
-                    String blockdata = null;
+                    String blockdata;
                     if (type == 7) {
                         blockdata = InteractionLookup.performLookup(command.getName(), statement, block, player, 0, page, limit);
                     }

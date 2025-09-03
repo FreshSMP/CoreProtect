@@ -39,12 +39,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import net.coreprotect.CoreProtect;
 import net.coreprotect.bukkit.BukkitAdapter;
 import net.coreprotect.config.ConfigHandler;
 import net.coreprotect.consumer.Queue;
 import net.coreprotect.model.BlockGroup;
 import net.coreprotect.paper.PaperAdapter;
 import net.coreprotect.thread.CacheHandler;
+import net.coreprotect.thread.Scheduler;
 import net.coreprotect.utility.BlockUtils;
 import net.coreprotect.utility.ChestTool;
 import net.coreprotect.utility.EntityUtils;
@@ -144,7 +146,7 @@ public class RollbackBlockHandler extends Queue {
                     for (Entity entity : block.getChunk().getEntities()) {
                         if (entity instanceof EnderCrystal) {
                             if (entity.getLocation().getBlockX() == rowX && entity.getLocation().getBlockY() == rowY && entity.getLocation().getBlockZ() == rowZ) {
-                                entity.remove();
+                                Scheduler.runTask(CoreProtect.getInstance(), entity::remove, entity);
                             }
                         }
                     }
@@ -168,11 +170,13 @@ public class RollbackBlockHandler extends Queue {
                                         entityLocation.setY(entityLocation.getY() + 0.99);
 
                                         if (entityLocation.getBlockX() == rowX && entityLocation.getBlockY() == rowY && entityLocation.getBlockZ() == rowZ) {
-                                            ItemUtils.getEntityEquipment((ArmorStand) entity).clear();
-
-                                            entityLocation.setY(entityLocation.getY() - 1.99);
-                                            PaperAdapter.ADAPTER.teleportAsync(entity, entityLocation);
-                                            entity.remove();
+                                            Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                                                ItemUtils.getEntityEquipment((ArmorStand) entity).clear();
+                                                Location back = entity.getLocation();
+                                                back.setY(back.getY() - 1.99);
+                                                PaperAdapter.ADAPTER.teleportAsync(entity, back);
+                                                entity.remove();
+                                            }, entity);
                                         }
                                     }
                                 }
@@ -467,11 +471,6 @@ public class RollbackBlockHandler extends Queue {
                 }
                 else {
                     boolean physics = true;
-                    /*
-                    if (blockData instanceof MultipleFacing || BukkitAdapter.ADAPTER.isWall(blockData) || blockData instanceof Snow || blockData instanceof Stairs || blockData instanceof RedstoneWire || blockData instanceof Chest) {
-                    physics = !(blockData instanceof Snow) || block.getY() <= BukkitAdapter.ADAPTER.getMinHeight(block.getWorld()) || (block.getWorld().getBlockAt(block.getX(), block.getY() - 1, block.getZ()).getType().equals(Material.GRASS_BLOCK));
-                    }
-                    */
                     BlockUtils.prepareTypeAndData(chunkChanges, block, rowType, blockData, physics);
                     return countBlock;
                 }

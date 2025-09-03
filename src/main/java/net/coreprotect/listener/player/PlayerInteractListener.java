@@ -341,23 +341,9 @@ public final class PlayerInteractListener extends Queue implements Listener {
                             ((Lightable) blockData).setLit(false);
                             Queue.queueBlockPlace(player.getName(), block.getState(), type, block.getState(), type, -1, 0, blockData.getAsString());
 
-                            /*
-                            BlockState blockState = block.getState();
-                            Bukkit.getServer().getScheduler().runTask(CoreProtect.getInstance(), () -> {
-                                try {
-                                    BlockData validateBlockData = block.getBlockData();
-                                    if (validateBlockData instanceof Lightable && !((Lightable) validateBlockData).isLit()) {
-                                        Queue.queueBlockPlace(player.getName(), blockState, type, blockState, type, -1, 0, validateBlockData.getAsString());
-                                    }
-                                }
-                                catch (Exception e) {
-                                    e.printStackTrace();
-                                }
-                            });
-                            */
                         }
                         else if (CampfireStartListener.useCampfireStartEvent && (type == Material.CAMPFIRE || type == Material.SOUL_CAMPFIRE)) {
-                            ItemStack handItem = null;
+                            ItemStack handItem;
                             ItemStack mainHand = player.getInventory().getItemInMainHand();
                             ItemStack offHand = player.getInventory().getItemInOffHand();
 
