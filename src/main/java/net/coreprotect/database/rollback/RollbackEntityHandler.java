@@ -26,6 +26,8 @@ public class RollbackEntityHandler {
      *            The type of rollback (0 for rollback, 1 for restore)
      * @param finalUserString
      *            The user string for tracking operations
+     * @param oldTypeRaw
+     *            The old raw type value
      * @param rowTypeRaw
      *            The raw type value
      * @param rowData
@@ -49,24 +51,31 @@ public class RollbackEntityHandler {
      * @return The number of entities affected (1 if successful, 0 otherwise)
      */
     public static int processEntity(Object[] row, int rollbackType, String finalUserString, int oldTypeRaw, int rowTypeRaw, int rowData, int rowAction, int rowRolledBack, int rowX, int rowY, int rowZ, int rowWorldId, int rowUserId, String rowUser) {
+        World bukkitWorld = Bukkit.getServer().getWorld(WorldUtils.getWorldName(rowWorldId));
+        if (bukkitWorld == null) {
+            return 0;
+        }
+
+        if (ConfigHandler.isFolia) {
+            // Folia - load chunk async before processing
+            bukkitWorld.getChunkAtAsync(rowX >> 4, rowZ >> 4, true).thenAccept(chunk -> {
+                processEntityLogic(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUserId, rowUser, bukkitWorld);
+            });
+            return 1; // assume task is queued successfully
+        }
+        else {
+            if (!bukkitWorld.isChunkLoaded(rowX >> 4, rowZ >> 4)) {
+                bukkitWorld.getChunkAt(rowX >> 4, rowZ >> 4);
+            }
+            return processEntityLogic(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUserId, rowUser, bukkitWorld);
+        }
+    }
+
+    private static int processEntityLogic(Object[] row, int rollbackType, String finalUserString, int oldTypeRaw, int rowTypeRaw, int rowData, int rowAction, int rowRolledBack, int rowX, int rowY, int rowZ, int rowWorldId, int rowUserId, String rowUser, World bukkitWorld) {
         try {
             // Entity kill
             if (rowAction == 3) {
-                String world = getWorldName(rowWorldId);
-                if (world.isEmpty()) {
-                    return 0;
-                }
-
-                World bukkitWorld = Bukkit.getServer().getWorld(world);
-                if (bukkitWorld == null) {
-                    return 0;
-                }
-
                 Block block = bukkitWorld.getBlockAt(rowX, rowY, rowZ);
-                if (!bukkitWorld.isChunkLoaded(block.getChunk())) {
-                    bukkitWorld.getChunkAt(block.getLocation());
-                }
-
                 if (rowTypeRaw > 0) {
                     // Spawn in entity
                     if (rowRolledBack == 0) {
