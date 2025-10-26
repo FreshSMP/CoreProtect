@@ -10,6 +10,8 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import net.coreprotect.CoreProtect;
+import net.coreprotect.thread.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -66,9 +68,21 @@ public class RollbackProcessor {
      */
     public static CompletableFuture<Boolean> processChunk(int finalChunkX, int finalChunkZ, long chunkKey, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
         if (ConfigHandler.isFolia) {
-            // Folia - load chunk async before processing
-            return bukkitRollbackWorld.getChunkAtAsync(finalChunkX, finalChunkZ, true).thenApply(chunk -> {
-                return processChunkLogic(finalChunkX, finalChunkZ, chunkKey, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
+            // Folia - load chunk async before processing, then switch to the region thread
+            return bukkitRollbackWorld.getChunkAtAsync(finalChunkX, finalChunkZ, true).thenCompose(chunk -> {
+                CompletableFuture<Boolean> future = new CompletableFuture<>();
+                Location regionLocation = new Location(bukkitRollbackWorld, (finalChunkX << 4), bukkitRollbackWorld.getMinHeight(), (finalChunkZ << 4));
+                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                    try {
+                        boolean result = processChunkLogic(finalChunkX, finalChunkZ, chunkKey, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
+                        future.complete(result);
+                    }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                        future.complete(false);
+                    }
+                }, regionLocation);
+                return future;
             });
         }
         else {
