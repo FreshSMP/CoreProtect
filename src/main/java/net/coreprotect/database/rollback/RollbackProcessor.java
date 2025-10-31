@@ -44,6 +44,31 @@ import net.coreprotect.utility.WorldUtils;
 
 public class RollbackProcessor {
 
+    /**
+     * Process data for a specific chunk
+     *
+     * @param finalChunkX
+     *            The chunk X coordinate
+     * @param finalChunkZ
+     *            The chunk Z coordinate
+     * @param chunkKey
+     *            The chunk lookup key
+     * @param blockList
+     *            The list of block data to process
+     * @param itemList
+     *            The list of item data to process
+     * @param rollbackType
+     *            The rollback type (0=rollback, 1=restore)
+     * @param preview
+     *            Whether this is a preview (0=no, 1=yes-non-destructive, 2=yes-destructive)
+     * @param finalUserString
+     *            The username performing the rollback
+     * @param finalUser
+     *            The user performing the rollback
+     * @param bukkitRollbackWorld
+     *            The world to process
+     * @return A CompletableFuture that completes with true if successful, false otherwise
+     */
     public static CompletableFuture<Boolean> processChunk(int finalChunkX, int finalChunkZ, long chunkKey, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
         if (ConfigHandler.isFolia) {
             return bukkitRollbackWorld.getChunkAtAsync(finalChunkX, finalChunkZ, true).thenCompose(chunk -> {
