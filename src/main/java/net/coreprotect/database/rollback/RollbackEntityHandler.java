@@ -1,7 +1,5 @@
 package net.coreprotect.database.rollback;
 
-import net.coreprotect.CoreProtect;
-import net.coreprotect.thread.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -10,8 +8,10 @@ import org.bukkit.block.BlockState;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 
+import net.coreprotect.CoreProtect;
 import net.coreprotect.config.ConfigHandler;
 import net.coreprotect.thread.CacheHandler;
+import net.coreprotect.thread.Scheduler;
 import net.coreprotect.utility.EntityUtils;
 import net.coreprotect.utility.WorldUtils;
 
@@ -20,16 +20,12 @@ public class RollbackEntityHandler {
     /**
      * Processes an entity-related rollback operation.
      *
-     * @param row
-     *            The database row containing entity data (used only for specific operations)
      * @param rollbackType
      *            The type of rollback (0 for rollback, 1 for restore)
      * @param finalUserString
      *            The user string for tracking operations
      * @param oldTypeRaw
      *            The old raw type value
-     * @param rowTypeRaw
-     *            The raw type value
      * @param rowData
      *            The data value
      * @param rowAction
@@ -44,61 +40,46 @@ public class RollbackEntityHandler {
      *            The Z coordinate
      * @param rowWorldId
      *            The world ID
-     * @param rowUserId
-     *            The user ID
      * @param rowUser
      *            The username associated with this entity change
      * @return The number of entities affected (1 if successful, 0 otherwise)
      */
-    public static int processEntity(Object[] row, int rollbackType, String finalUserString, int oldTypeRaw, int rowTypeRaw, int rowData, int rowAction, int rowRolledBack, int rowX, int rowY, int rowZ, int rowWorldId, int rowUserId, String rowUser) {
+    public static int processEntity(int rollbackType, String finalUserString, int oldTypeRaw, int rowData, int rowAction, int rowRolledBack, int rowX, int rowY, int rowZ, int rowWorldId, String rowUser) {
         World bukkitWorld = Bukkit.getServer().getWorld(WorldUtils.getWorldName(rowWorldId));
         if (bukkitWorld == null) {
             return 0;
         }
 
+        Location entityLocation = new Location(bukkitWorld, rowX, rowY, rowZ);
+
         if (ConfigHandler.isFolia) {
-            // Folia - load chunk async before processing
-            bukkitWorld.getChunkAtAsync(rowX >> 4, rowZ >> 4, true).thenAccept(chunk -> {
-                processEntityLogic(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUserId, rowUser, bukkitWorld);
-            });
+            Scheduler.runTask(CoreProtect.getInstance(), () -> processEntityLogic(finalUserString, oldTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUser, bukkitWorld), entityLocation);
             return 1; // assume task is queued successfully
         }
         else {
             if (!bukkitWorld.isChunkLoaded(rowX >> 4, rowZ >> 4)) {
                 bukkitWorld.getChunkAt(rowX >> 4, rowZ >> 4);
             }
-            return processEntityLogic(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUserId, rowUser, bukkitWorld);
+            return processEntityLogic(finalUserString, oldTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUser, bukkitWorld);
         }
     }
 
-    private static int processEntityLogic(Object[] row, int rollbackType, String finalUserString, int oldTypeRaw, int rowTypeRaw, int rowData, int rowAction, int rowRolledBack, int rowX, int rowY, int rowZ, int rowWorldId, int rowUserId, String rowUser, World bukkitWorld) {
+    private static int processEntityLogic(String finalUserString, int oldTypeRaw, int rowData, int rowAction, int rowRolledBack, int rowX, int rowY, int rowZ, int rowWorldId, String rowUser, World bukkitWorld) {
         try {
             // Entity kill
             if (rowAction == 3) {
                 Block block = bukkitWorld.getBlockAt(rowX, rowY, rowZ);
-                if (rowTypeRaw > 0) {
-                    // Spawn in entity
-                    if (rowRolledBack == 0) {
-                        EntityType entityType = EntityUtils.getEntityType(rowTypeRaw);
-                        // Use the spawnEntity method from the RollbackUtil class instead of Queue
-                        spawnEntity(rowUser, block.getState(), entityType, rowData);
-                        updateEntityCount(finalUserString, 1);
-                        return 1;
-                    }
-                }
-                else if (rowTypeRaw <= 0) {
+                if (oldTypeRaw <= 0) {
                     // Attempt to remove entity
                     if (rowRolledBack == 1) {
                         boolean removed = false;
-                        int entityId;
+                        int entityId = -1;
                         String entityName = EntityUtils.getEntityType(oldTypeRaw).name();
-                        String token = "" + rowX + "." + rowY + "." + rowZ + "." + rowWorldId + "." + entityName + "";
+                        String token = rowX + "." + rowY + "." + rowZ + "." + rowWorldId + "." + entityName;
                         Object[] cachedEntity = CacheHandler.entityCache.get(token);
 
                         if (cachedEntity != null) {
                             entityId = (Integer) cachedEntity[1];
-                        } else {
-                            entityId = -1;
                         }
 
                         int xmin = rowX - 5;
@@ -109,44 +90,57 @@ public class RollbackEntityHandler {
                         int zmax = rowZ + 5;
 
                         for (Entity entity : block.getChunk().getEntities()) {
-                            Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                                if (entityId > -1) {
-                                    if (entity.getEntityId() == entityId) {
-                                        updateEntityCount(finalUserString, 1);
-                                        entity.remove();
-                                    }
-                                } else {
-                                    if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
-                                        Location entityLocation = entity.getLocation();
-                                        int entityx = entityLocation.getBlockX();
-                                        int entityY = entityLocation.getBlockY();
-                                        int entityZ = entityLocation.getBlockZ();
+                            if (entityId > -1) {
+                                int id = entity.getEntityId();
+                                if (id == entityId) {
+                                    updateEntityCount(finalUserString, 1);
+                                    removed = true;
+                                    Scheduler.runTask(CoreProtect.getInstance(), entity::remove, entity);
+                                    break;
+                                }
+                            }
+                            else {
+                                if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
+                                    Location entityLocation = entity.getLocation();
+                                    int entityx = entityLocation.getBlockX();
+                                    int entityY = entityLocation.getBlockY();
+                                    int entityZ = entityLocation.getBlockZ();
 
-                                        if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
-                                            updateEntityCount(finalUserString, 1);
-                                            entity.remove();
-                                        }
+                                    if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
+                                        updateEntityCount(finalUserString, 1);
+                                        removed = true;
+                                        Scheduler.runTask(CoreProtect.getInstance(), entity::remove, entity);
+                                        break;
                                     }
                                 }
-                            }, entity);
+                            }
                         }
 
                         if (!removed && entityId > -1) {
                             for (Entity entity : block.getWorld().getLivingEntities()) {
-                                if (entity.getEntityId() == entityId) {
-                                    Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                                        updateEntityCount(finalUserString, 1);
-                                        entity.remove();
-                                    }, entity);
+                                int id = entity.getEntityId();
+                                if (id == entityId) {
+                                    updateEntityCount(finalUserString, 1);
+                                    removed = true;
+                                    Scheduler.runTask(CoreProtect.getInstance(), entity::remove, entity);
                                     break;
                                 }
                             }
-                            removed = true;
                         }
 
                         if (removed) {
                             return 1;
                         }
+                    }
+                }
+                else {
+                    // Spawn in entity
+                    if (rowRolledBack == 0) {
+                        EntityType entityType = EntityUtils.getEntityType(oldTypeRaw);
+                        // Use the spawnEntity method from the RollbackUtil class instead of queue
+                        spawnEntity(rowUser, block.getState(), entityType, rowData);
+                        updateEntityCount(finalUserString, 1);
+                        return 1;
                     }
                 }
             }
@@ -156,17 +150,6 @@ public class RollbackEntityHandler {
         }
 
         return 0;
-    }
-
-    /**
-     * Gets the world name from a world ID.
-     *
-     * @param worldId
-     *            The world ID
-     * @return The world name
-     */
-    private static String getWorldName(int worldId) {
-        return WorldUtils.getWorldName(worldId);
     }
 
     /**

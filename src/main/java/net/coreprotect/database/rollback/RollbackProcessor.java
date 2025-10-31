@@ -10,8 +10,6 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import net.coreprotect.CoreProtect;
-import net.coreprotect.thread.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -19,8 +17,11 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.Jukebox;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.Jukebox;
+import org.bukkit.block.data.MultipleFacing;
+import org.bukkit.block.data.type.RedstoneWire;
+import org.bukkit.block.data.type.Stairs;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
@@ -28,11 +29,13 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import net.coreprotect.CoreProtect;
 import net.coreprotect.bukkit.BukkitAdapter;
 import net.coreprotect.config.Config;
 import net.coreprotect.config.ConfigHandler;
 import net.coreprotect.database.logger.ItemLogger;
 import net.coreprotect.model.BlockGroup;
+import net.coreprotect.thread.Scheduler;
 import net.coreprotect.utility.BlockUtils;
 import net.coreprotect.utility.ItemUtils;
 import net.coreprotect.utility.MaterialUtils;
@@ -41,66 +44,47 @@ import net.coreprotect.utility.WorldUtils;
 
 public class RollbackProcessor {
 
-    /**
-     * Process data for a specific chunk
-     *
-     * @param finalChunkX
-     *            The chunk X coordinate
-     * @param finalChunkZ
-     *            The chunk Z coordinate
-     * @param chunkKey
-     *            The chunk lookup key
-     * @param blockList
-     *            The list of block data to process
-     * @param itemList
-     *            The list of item data to process
-     * @param rollbackType
-     *            The rollback type (0=rollback, 1=restore)
-     * @param preview
-     *            Whether this is a preview (0=no, 1=yes-non-destructive, 2=yes-destructive)
-     * @param finalUserString
-     *            The username performing the rollback
-     * @param finalUser
-     *            The user performing the rollback
-     * @param bukkitRollbackWorld
-     *            The world to process
-     * @return A CompletableFuture that completes with true if successful, false otherwise
-     */
     public static CompletableFuture<Boolean> processChunk(int finalChunkX, int finalChunkZ, long chunkKey, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
         if (ConfigHandler.isFolia) {
-            // Folia - load chunk async before processing, then switch to the region thread
             return bukkitRollbackWorld.getChunkAtAsync(finalChunkX, finalChunkZ, true).thenCompose(chunk -> {
                 CompletableFuture<Boolean> future = new CompletableFuture<>();
-                Location regionLocation = new Location(bukkitRollbackWorld, (finalChunkX << 4), bukkitRollbackWorld.getMinHeight(), (finalChunkZ << 4));
+
+                Location chunkLocation = new Location(bukkitRollbackWorld, finalChunkX << 4, 64, finalChunkZ << 4);
+
                 Scheduler.runTask(CoreProtect.getInstance(), () -> {
                     try {
-                        boolean result = processChunkLogic(finalChunkX, finalChunkZ, chunkKey, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
+                        boolean result = processChunkLogic(finalChunkX, finalChunkZ, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
                         future.complete(result);
-                    }
-                    catch (Exception e) {
+                    } catch (Exception e) {
                         e.printStackTrace();
                         future.complete(false);
                     }
-                }, regionLocation);
+                }, chunkLocation);
+
                 return future;
             });
         }
         else {
-            try {
-                if (!bukkitRollbackWorld.isChunkLoaded(finalChunkX, finalChunkZ)) {
-                    bukkitRollbackWorld.getChunkAt(finalChunkX, finalChunkZ);
+            CompletableFuture<Boolean> future = new CompletableFuture<>();
+            Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                try {
+                    if (!bukkitRollbackWorld.isChunkLoaded(finalChunkX, finalChunkZ)) {
+                        bukkitRollbackWorld.getChunkAt(finalChunkX, finalChunkZ);
+                    }
+                    boolean result = processChunkLogic(finalChunkX, finalChunkZ, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
+                    future.complete(result);
                 }
-                boolean result = processChunkLogic(finalChunkX, finalChunkZ, chunkKey, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
-                return CompletableFuture.completedFuture(result);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                return CompletableFuture.completedFuture(false);
-            }
+                catch (Exception e) {
+                    e.printStackTrace();
+                    future.complete(false);
+                }
+            });
+
+            return future;
         }
     }
 
-    private static boolean processChunkLogic(int finalChunkX, int finalChunkZ, long chunkKey, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
+    private static boolean processChunkLogic(int finalChunkX, int finalChunkZ, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
         try {
             boolean clearInventories = Config.getGlobal().ROLLBACK_ITEMS;
             ArrayList<Object[]> data = blockList != null ? blockList : new ArrayList<>();
@@ -133,7 +117,7 @@ public class RollbackProcessor {
                 }
 
                 BlockData blockData = null;
-                if (blockDataString != null && blockDataString.contains(":")) {
+                if (blockDataString != null && !blockDataString.isEmpty()) {
                     try {
                         blockData = Bukkit.getServer().createBlockData(blockDataString);
                     }
@@ -157,25 +141,21 @@ public class RollbackProcessor {
                 if (rowAction == 1 && rollbackType == 0) { // block placement
                     rowType = Material.AIR;
                     blockData = null;
-                    rowTypeRaw = 0;
                 }
                 else if (rowAction == 0 && rollbackType == 1) { // block removal
                     rowType = Material.AIR;
                     blockData = null;
-                    rowTypeRaw = 0;
                 }
                 else if (rowAction == 4 && rollbackType == 0) { // entity placement
                     rowType = null;
-                    rowTypeRaw = 0;
                 }
                 else if (rowAction == 3 && rollbackType == 1) { // entity removal
                     rowType = null;
-                    rowTypeRaw = 0;
                 }
                 if (preview > 0) {
                     if (rowAction != 3) { // entity kill
                         String world = WorldUtils.getWorldName(rowWorldId);
-                        if (world.length() == 0) {
+                        if (world.isEmpty()) {
                             continue;
                         }
 
@@ -193,7 +173,7 @@ public class RollbackProcessor {
                             }
                         }
                         else {
-                            if ((!BukkitAdapter.ADAPTER.isItemFrame(rowType)) && (rowType != Material.PAINTING) && (rowType != Material.ARMOR_STAND) && (rowType != Material.END_CRYSTAL)) {
+                            if (rowType != null && (!BukkitAdapter.ADAPTER.isItemFrame(rowType)) && (rowType != Material.PAINTING) && (rowType != Material.ARMOR_STAND) && (rowType != Material.END_CRYSTAL)) {
                                 BlockUtils.prepareTypeAndData(chunkChanges, block, rowType, blockData, true);
                                 blockCount++;
                             }
@@ -204,11 +184,11 @@ public class RollbackProcessor {
                     }
                 }
                 else if (rowAction == 3) { // entity kill
-                    entityCount += RollbackEntityHandler.processEntity(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, MaterialUtils.rolledBack((Integer) row[9], false), rowX, rowY, rowZ, rowWorldId, (Integer) row[2], rowUser);
+                    entityCount += RollbackEntityHandler.processEntity(rollbackType, finalUserString, oldTypeRaw, rowData, rowAction, MaterialUtils.rolledBack((Integer) row[9], false), rowX, rowY, rowZ, rowWorldId, rowUser);
                 }
                 else {
                     String world = WorldUtils.getWorldName(rowWorldId);
-                    if (world.length() == 0) {
+                    if (world.isEmpty()) {
                         continue;
                     }
 
@@ -232,7 +212,7 @@ public class RollbackProcessor {
                         pendingChangeData = changeBlockData;
                     }
 
-                    if (rowRolledBack == 1 && rollbackType == 0) { // rollback
+                    if (MaterialUtils.rolledBack((Integer) row[9], false) == 1 && rollbackType == 0) { // rollback
                         countBlock = false;
                     }
 
@@ -240,7 +220,7 @@ public class RollbackProcessor {
                         // block is already changed!
                         BlockData checkData = rowType == Material.AIR ? blockData : rawBlockData;
                         if (checkData != null) {
-                            if (checkData.getAsString().equals(pendingChangeData.getAsString()) || checkData instanceof org.bukkit.block.data.MultipleFacing || checkData instanceof org.bukkit.block.data.type.Stairs || checkData instanceof org.bukkit.block.data.type.RedstoneWire) {
+                            if (checkData.getAsString().equals(pendingChangeData.getAsString()) || checkData instanceof MultipleFacing || checkData instanceof Stairs || checkData instanceof RedstoneWire) {
                                 if (rowType != Material.CHEST && rowType != Material.TRAPPED_CHEST && !BukkitAdapter.ADAPTER.isCopperChest(rowType)) { // always update double chests
                                     changeBlock = false;
                                 }
@@ -298,9 +278,7 @@ public class RollbackProcessor {
                 int rowY = (Integer) row[4];
                 int rowZ = (Integer) row[5];
                 int rowTypeRaw = (Integer) row[6];
-                int rowData = (Integer) row[7];
                 int rowAction = (Integer) row[8];
-                int rowRolledBack = MaterialUtils.rolledBack((Integer) row[9], false);
                 int rowWorldId = (Integer) row[10];
                 int rowAmount = (Integer) row[11];
                 byte[] rowMetadata = (byte[]) row[12];
@@ -326,7 +304,7 @@ public class RollbackProcessor {
                             continue;
                         }
 
-                        int inventoryAction = 0;
+                        int inventoryAction;
                         if (rowAction == ItemLogger.ITEM_DROP || rowAction == ItemLogger.ITEM_PICKUP || rowAction == ItemLogger.ITEM_THROW || rowAction == ItemLogger.ITEM_SHOOT || rowAction == ItemLogger.ITEM_BREAK || rowAction == ItemLogger.ITEM_DESTROY || rowAction == ItemLogger.ITEM_CREATE || rowAction == ItemLogger.ITEM_SELL || rowAction == ItemLogger.ITEM_BUY) {
                             inventoryAction = ((rowAction == ItemLogger.ITEM_PICKUP || rowAction == ItemLogger.ITEM_CREATE || rowAction == ItemLogger.ITEM_BUY) ? 1 : 0);
                         }
@@ -361,7 +339,7 @@ public class RollbackProcessor {
                         continue; // skip inventory & ender chest transactions
                     }
 
-                    if ((rollbackType == 0 && rowRolledBack == 0) || (rollbackType == 1 && rowRolledBack == 1)) {
+                    if ((rollbackType == 0 && MaterialUtils.rolledBack((Integer) row[9], false) == 0) || (rollbackType == 1 && MaterialUtils.rolledBack((Integer) row[9], false) == 1)) {
                         ItemStack itemstack = new ItemStack(rowType, rowAmount);
                         Object[] populatedStack = RollbackItemHandler.populateItemStack(itemstack, rowMetadata);
                         String faceData = (String) populatedStack[1];
@@ -369,7 +347,7 @@ public class RollbackProcessor {
                         if (!containerInit || rowX != lastX || rowY != lastY || rowZ != lastZ || rowWorldId != lastWorldId || !faceData.equals(lastFace)) {
                             container = null; // container patch 2.14.0
                             String world = WorldUtils.getWorldName(rowWorldId);
-                            if (world.length() == 0) {
+                            if (world.isEmpty()) {
                                 continue;
                             }
 
@@ -400,7 +378,7 @@ public class RollbackProcessor {
                                         else if (entity instanceof ItemFrame) {
                                             container = entity;
                                             containerType = Material.ITEM_FRAME;
-                                            if (faceData.length() > 0 && (BlockFace.valueOf(faceData) == ((ItemFrame) entity).getFacing())) {
+                                            if (!faceData.isEmpty() && (BlockFace.valueOf(faceData) == ((ItemFrame) entity).getFacing())) {
                                                 break;
                                             }
                                         }

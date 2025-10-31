@@ -1,6 +1,5 @@
 package net.coreprotect.utility;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,7 +17,6 @@ import net.coreprotect.language.Phrase;
 import net.coreprotect.model.BlockGroup;
 import net.coreprotect.paper.PaperAdapter;
 import net.coreprotect.thread.Scheduler;
-import net.coreprotect.utility.BlockUtils;
 
 public class Teleport {
 
@@ -30,7 +28,8 @@ public class Teleport {
 
     public static void performSafeTeleport(Player player, Location location, boolean enforceTeleport) {
         try {
-            Set<Material> unsafeBlocks = new HashSet<>(Arrays.asList(Material.LAVA));
+            Set<Material> unsafeBlocks = new HashSet<>();
+            unsafeBlocks.add(Material.LAVA);
             unsafeBlocks.addAll(BlockGroup.FIRE);
 
             int worldHeight = location.getWorld().getMaxHeight();
@@ -48,10 +47,9 @@ public class Teleport {
                     above = worldHeight;
                 }
 
-                Block block1 = location.getWorld().getBlockAt(playerX, checkY, playerZ);
+                final Block block1 = location.getWorld().getBlockAt(playerX, checkY, playerZ);
                 Block block2 = location.getWorld().getBlockAt(playerX, above, playerZ);
                 Material type1 = block1.getType();
-                Material type2 = block2.getType();
 
                 if (BlockUtils.passableBlock(block1) && BlockUtils.passableBlock(block2)) {
                     if (unsafeBlocks.contains(type1)) {
@@ -65,15 +63,19 @@ public class Teleport {
 
                             if (checkY < worldHeight && unsafeBlocks.contains(blockBelow.getType())) {
                                 alert = true;
-                                Location revertLocation = block1.getLocation();
-                                BlockData revertBlockData = block1.getBlockData();
+                                final Location revertLocation = block1.getLocation();
+                                final BlockData revertBlockData = block1.getBlockData();
                                 revertBlocks.put(revertLocation, revertBlockData);
-                                if (!ConfigHandler.isFolia) {
-                                    block1.setType(Material.BARRIER);
-                                }
-                                else {
-                                    block1.setType(Material.DIRT);
-                                }
+
+                                Scheduler.scheduleSyncDelayedTask(CoreProtect.getInstance(), () -> {
+                                    if (!ConfigHandler.isFolia) {
+                                        block1.setType(Material.BARRIER);
+                                    }
+                                    else {
+                                        block1.setType(Material.DIRT);
+                                    }
+                                }, revertLocation, 1);
+
                                 checkY++;
 
                                 Scheduler.scheduleSyncDelayedTask(CoreProtect.getInstance(), () -> {
@@ -128,5 +130,4 @@ public class Teleport {
             e.printStackTrace();
         }
     }
-
 }

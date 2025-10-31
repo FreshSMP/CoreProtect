@@ -222,14 +222,6 @@ public final class EntityDeathListener extends Queue implements Listener {
                 Block block = entityLocation.getBlock();
                 Queue.queueBlockBreak(e, block.getState(), Material.ARMOR_STAND, null, (int) entityLocation.getYaw());
             }
-            /*
-            else if (isCommand) {
-                entityLocation.setY(entityLocation.getY() + 0.99);
-                Block block = entityLocation.getBlock();
-                Database.containerBreakCheck(e, Material.ARMOR_STAND, entity, null, block.getLocation());
-                Queue.queueBlockBreak(e, block.getState(), Material.ARMOR_STAND, null, (int) entityLocation.getYaw());
-            }
-            */
             return;
         }
 
