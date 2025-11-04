@@ -52,7 +52,8 @@ public class BlockUtil {
             int yc = y - 1;
             // user placing sand/gravel. Find the bottom block
             int bottomfound = 0;
-            while (bottomfound == 0) {
+            int i = 0;
+            while (bottomfound == 0 && i < 256) {
                 if (yc < BukkitAdapter.ADAPTER.getMinHeight(world)) {
                     block = world.getBlockAt(x, yc + 1, z);
                     bottomfound = 1;
@@ -69,7 +70,7 @@ public class BlockUtil {
                         bottomfound = 1;
                     }
                     else {
-                        String cords = "" + x + "." + yc + "." + z + "." + wid + "";
+                        String cords = x + "." + yc + "." + z + "." + wid;
                         Object[] data = CacheHandler.lookupCache.get(cords);
                         if (data != null) {
                             Material t = (Material) data[2];
@@ -81,8 +82,9 @@ public class BlockUtil {
                     }
                     yc--;
                 }
+                i++;
             }
-            CacheHandler.lookupCache.put("" + x + "." + block.getY() + "." + z + "." + wid + "", new Object[] { timestamp, player, type });
+            CacheHandler.lookupCache.put(x + "." + block.getY() + "." + z + "." + wid, new Object[] { timestamp, player, type });
         }
 
         return block;

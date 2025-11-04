@@ -494,7 +494,7 @@ public class RollbackBlockHandler extends Queue {
 
     /**
      * Update the block count in the rollback hash
-     * 
+     *
      * @param userString
      *            The username for this rollback
      * @param increment
@@ -513,7 +513,7 @@ public class RollbackBlockHandler extends Queue {
 
     /**
      * Apply all pending block changes to the world
-     * 
+     *
      * @param chunkChanges
      *            Map of blocks to change
      * @param preview

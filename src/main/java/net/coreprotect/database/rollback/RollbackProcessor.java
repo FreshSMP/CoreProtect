@@ -8,7 +8,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
+import net.coreprotect.CoreProtect;
+import net.coreprotect.thread.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -61,9 +64,42 @@ public class RollbackProcessor {
      *            The user performing the rollback
      * @param bukkitRollbackWorld
      *            The world to process
-     * @return True if successful, false if there was an error
+     * @return A CompletableFuture that completes with true if successful, false otherwise
      */
-    public static boolean processChunk(int finalChunkX, int finalChunkZ, long chunkKey, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
+    public static CompletableFuture<Boolean> processChunk(int finalChunkX, int finalChunkZ, long chunkKey, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
+        if (ConfigHandler.isFolia) {
+            return bukkitRollbackWorld.getChunkAtAsync(finalChunkX, finalChunkZ, true).thenCompose(chunk -> {
+                CompletableFuture<Boolean> future = new CompletableFuture<>();
+                Location regionLocation = new Location(bukkitRollbackWorld, (finalChunkX << 4), bukkitRollbackWorld.getMinHeight(), (finalChunkZ << 4));
+                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                    try {
+                        boolean result = processChunkLogic(finalChunkX, finalChunkZ, chunkKey, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
+                        future.complete(result);
+                    }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                        future.complete(false);
+                    }
+                }, regionLocation);
+                return future;
+            });
+        }
+        else {
+            try {
+                if (!bukkitRollbackWorld.isChunkLoaded(finalChunkX, finalChunkZ)) {
+                    bukkitRollbackWorld.getChunkAt(finalChunkX, finalChunkZ);
+                }
+                boolean result = processChunkLogic(finalChunkX, finalChunkZ, chunkKey, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
+                return CompletableFuture.completedFuture(result);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                return CompletableFuture.completedFuture(false);
+            }
+        }
+    }
+
+    private static boolean processChunkLogic(int finalChunkX, int finalChunkZ, long chunkKey, ArrayList<Object[]> blockList, ArrayList<Object[]> itemList, int rollbackType, int preview, String finalUserString, Player finalUser, World bukkitRollbackWorld, boolean inventoryRollback) {
         try {
             boolean clearInventories = Config.getGlobal().ROLLBACK_ITEMS;
             ArrayList<Object[]> data = blockList != null ? blockList : new ArrayList<>();
@@ -76,7 +112,6 @@ public class RollbackProcessor {
                 int itemCount = rollbackHashData[0];
                 int blockCount = rollbackHashData[1];
                 int entityCount = rollbackHashData[2];
-                int scannedWorlds = rollbackHashData[4];
 
                 int rowX = (Integer) row[3];
                 int rowY = (Integer) row[4];
@@ -182,9 +217,6 @@ public class RollbackProcessor {
                     }
 
                     Block block = bukkitWorld.getBlockAt(rowX, rowY, rowZ);
-                    if (!bukkitWorld.isChunkLoaded(block.getChunk())) {
-                        bukkitWorld.getChunkAt(block.getLocation());
-                    }
 
                     boolean changeBlock = true;
                     boolean countBlock = true;
@@ -238,12 +270,12 @@ public class RollbackProcessor {
                     }
                 }
 
-                ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount, blockCount, entityCount, 0, scannedWorlds });
+                ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount, blockCount, entityCount, 0, 0 });
             }
             data.clear();
 
             // Apply cached block changes
-            RollbackBlockHandler.applyBlockChanges(chunkChanges, preview, finalUser instanceof Player ? (Player) finalUser : null);
+            RollbackBlockHandler.applyBlockChanges(chunkChanges, preview, finalUser);
 
             // Process container items
             Map<Player, List<Integer>> sortPlayers = new HashMap<>();
@@ -261,7 +293,6 @@ public class RollbackProcessor {
                 int itemCount1 = rollbackHashData1[0];
                 int blockCount1 = rollbackHashData1[1];
                 int entityCount1 = rollbackHashData1[2];
-                int scannedWorlds = rollbackHashData1[4];
                 int rowX = (Integer) row[3];
                 int rowY = (Integer) row[4];
                 int rowZ = (Integer) row[5];
@@ -321,7 +352,7 @@ public class RollbackProcessor {
                         }
 
                         itemCount1 = itemCount1 + rowAmount;
-                        ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount1, blockCount1, entityCount1, 0, scannedWorlds });
+                        ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount1, blockCount1, entityCount1, 0, 0 });
                         continue; // remove this for merged rollbacks in future? (be sure to re-enable chunk sorting)
                     }
 
@@ -346,9 +377,6 @@ public class RollbackProcessor {
                                 continue;
                             }
                             Block block = bukkitWorld.getBlockAt(rowX, rowY, rowZ);
-                            if (!bukkitWorld.isChunkLoaded(block.getChunk())) {
-                                bukkitWorld.getChunkAt(block.getLocation());
-                            }
 
                             if (BlockGroup.CONTAINERS.contains(block.getType())) {
                                 BlockState blockState = block.getState();
@@ -406,7 +434,7 @@ public class RollbackProcessor {
                     }
                 }
 
-                ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount1, blockCount1, entityCount1, 0, scannedWorlds });
+                ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount1, blockCount1, entityCount1, 0, 0 });
             }
             itemData.clear();
 
@@ -419,8 +447,7 @@ public class RollbackProcessor {
             int itemCount = rollbackHashData[0];
             int blockCount = rollbackHashData[1];
             int entityCount = rollbackHashData[2];
-            int scannedWorlds = rollbackHashData[4];
-            ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount, blockCount, entityCount, 1, (scannedWorlds + 1) });
+            ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount, blockCount, entityCount, 1, 1 });
 
             // Teleport players out of danger if they're within this chunk
             if (preview == 0) {
@@ -444,9 +471,8 @@ public class RollbackProcessor {
             int itemCount = rollbackHashData[0];
             int blockCount = rollbackHashData[1];
             int entityCount = rollbackHashData[2];
-            int scannedWorlds = rollbackHashData[4];
 
-            ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount, blockCount, entityCount, 2, (scannedWorlds + 1) });
+            ConfigHandler.rollbackHash.put(finalUserString, new int[] { itemCount, blockCount, entityCount, 2, 1 });
             return false;
         }
     }
