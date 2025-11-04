@@ -128,7 +128,7 @@ public final class EntityDamageByEntityListener extends Queue implements Listene
                             String killer = user;
                             ItemStack[] contents = ItemUtils.getContainerContents(Material.ARMOR_STAND, entity, block.getLocation());
                             Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                                if (entity.isDead()) {
+                                if (entity != null && entity.isDead()) {
                                     entityLocation.setY(entityLocation.getY() + 0.99);
                                     Database.containerBreakCheck(killer, Material.ARMOR_STAND, entity, contents, block.getLocation());
                                     Queue.queueBlockBreak(killer, block.getState(), Material.ARMOR_STAND, null, (int) entityLocation.getYaw());

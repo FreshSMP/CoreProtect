@@ -63,14 +63,13 @@ public class RollbackBlockHandler extends Queue {
             if (changeBlock) {
                 /* If modifying the head of a piston, update the base piston block to prevent it from being destroyed */
                 if (changeBlockData instanceof PistonHead) {
-                    final PistonHead pistonHead = (PistonHead) changeBlockData;
-                    final Block pistonBlock = block.getRelative(pistonHead.getFacing().getOppositeFace());
+                    PistonHead pistonHead = (PistonHead) changeBlockData;
+                    Block pistonBlock = block.getRelative(pistonHead.getFacing().getOppositeFace());
                     BlockData pistonData = pistonBlock.getBlockData();
                     if (pistonData instanceof Piston) {
-                        final Piston piston = (Piston) pistonData;
+                        Piston piston = (Piston) pistonData;
                         piston.setExtended(false);
-                        Location pistonLocation = pistonBlock.getLocation();
-                        Scheduler.runTask(CoreProtect.getInstance(), () -> pistonBlock.setBlockData(piston, false), pistonLocation);
+                        pistonBlock.setBlockData(piston, false);
                     }
                 }
                 else if (rowType == Material.MOVING_PISTON && blockData instanceof TechnicalPiston && !(blockData instanceof PistonHead)) {
@@ -102,10 +101,8 @@ public class RollbackBlockHandler extends Queue {
                     }
 
                     if (!exists) {
-                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                            Entity entity = block.getLocation().getWorld().spawnEntity(location1, EntityType.ARMOR_STAND);
-                            PaperAdapter.ADAPTER.teleportAsync(entity, location1);
-                        }, location1);
+                        Entity entity = block.getLocation().getWorld().spawnEntity(location1, EntityType.ARMOR_STAND);
+                        PaperAdapter.ADAPTER.teleportAsync(entity, location1);
                     }
                 }
                 else if ((rowType == Material.END_CRYSTAL)) {
@@ -123,12 +120,10 @@ public class RollbackBlockHandler extends Queue {
                     }
 
                     if (!exists) {
-                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                            Entity entity = block.getLocation().getWorld().spawnEntity(location1, BukkitAdapter.ADAPTER.getEntityType(Material.END_CRYSTAL));
-                            EnderCrystal enderCrystal = (EnderCrystal) entity;
-                            enderCrystal.setShowingBottom((rowData != 0));
-                            PaperAdapter.ADAPTER.teleportAsync(entity, location1);
-                        }, location1);
+                        Entity entity = block.getLocation().getWorld().spawnEntity(location1, BukkitAdapter.ADAPTER.getEntityType(Material.END_CRYSTAL));
+                        EnderCrystal enderCrystal = (EnderCrystal) entity;
+                        enderCrystal.setShowingBottom((rowData != 0));
+                        PaperAdapter.ADAPTER.teleportAsync(entity, location1);
                     }
                 }
                 else if ((rowType == Material.AIR) && ((oldTypeMaterial == Material.WATER))) {
@@ -147,14 +142,16 @@ public class RollbackBlockHandler extends Queue {
                     BlockUtils.prepareTypeAndData(chunkChanges, block, rowType, blockData, true);
                     return countBlock;
                 }
-                else if ((rowType == Material.AIR) && ((oldTypeMaterial == Material.END_CRYSTAL))) {
+                else if ((rowType == Material.AIR) && (oldTypeMaterial == Material.END_CRYSTAL)) {
                     for (Entity entity : block.getChunk().getEntities()) {
-                        if (entity instanceof EnderCrystal) {
-                            if (entity.getLocation().getBlockX() == rowX && entity.getLocation().getBlockY() == rowY && entity.getLocation().getBlockZ() == rowZ) {
-                                Location entityLocation = entity.getLocation();
-                                Scheduler.runTask(CoreProtect.getInstance(), entity::remove, entityLocation);
+                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                            if (entity instanceof EnderCrystal) {
+                                Location location = entity.getLocation();
+                                if (location.getBlockX() == rowX && location.getBlockY() == rowY && location.getBlockZ() == rowZ) {
+                                    entity.remove();
+                                }
                             }
-                        }
+                        }, entity);
                     }
                 }
                 else if (rollbackType == 0 && rowAction == 0 && (rowType == Material.AIR)) {
@@ -165,7 +162,7 @@ public class RollbackBlockHandler extends Queue {
                         if (BlockGroup.CONTAINERS.contains(changeType)) {
                             Inventory inventory = BlockUtils.getContainerInventory(block.getState(), false);
                             if (inventory != null) {
-                                Scheduler.runTask(CoreProtect.getInstance(), inventory::clear, block.getLocation());
+                                inventory.clear();
                             }
                         }
                         else if (BlockGroup.CONTAINERS.contains(Material.ARMOR_STAND)) {
@@ -176,12 +173,13 @@ public class RollbackBlockHandler extends Queue {
                                         entityLocation.setY(entityLocation.getY() + 0.99);
 
                                         if (entityLocation.getBlockX() == rowX && entityLocation.getBlockY() == rowY && entityLocation.getBlockZ() == rowZ) {
-                                            ItemUtils.getEntityEquipment((ArmorStand) entity).clear();
-
-                                            entityLocation.setY(entityLocation.getY() - 1.99);
-                                            PaperAdapter.ADAPTER.teleportAsync(entity, entityLocation);
-
-                                            Scheduler.runTask(CoreProtect.getInstance(), entity::remove, entityLocation);
+                                            Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                                                ItemUtils.getEntityEquipment((ArmorStand) entity).clear();
+                                                Location back = entity.getLocation();
+                                                back.setY(back.getY() - 1.99);
+                                                PaperAdapter.ADAPTER.teleportAsync(entity, back);
+                                                entity.remove();
+                                            }, entity);
                                         }
                                     }
                                 }
@@ -250,13 +248,9 @@ public class RollbackBlockHandler extends Queue {
                 else if ((rowType == Material.SPAWNER)) {
                     try {
                         BlockUtils.prepareTypeAndData(chunkChanges, block, rowType, blockData, false);
-
-                        final Location blockLocation = block.getLocation();
-                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                            CreatureSpawner mobSpawner = (CreatureSpawner) block.getState();
-                            mobSpawner.setSpawnedType(EntityUtils.getSpawnerType(rowData));
-                            mobSpawner.update();
-                        }, blockLocation);
+                        CreatureSpawner mobSpawner = (CreatureSpawner) block.getState();
+                        mobSpawner.setSpawnedType(EntityUtils.getSpawnerType(rowData));
+                        mobSpawner.update();
 
                         return countBlock;
                     }
@@ -301,17 +295,14 @@ public class RollbackBlockHandler extends Queue {
                     }
 
                     if (meta != null) {
-                        final Location blockLocation = block.getLocation();
-                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                            CommandBlock commandBlock = (CommandBlock) block.getState();
-                            for (Object value : meta) {
-                                if (value instanceof String) {
-                                    String string = (String) value;
-                                    commandBlock.setCommand(string);
-                                    commandBlock.update();
-                                }
+                        CommandBlock commandBlock = (CommandBlock) block.getState();
+                        for (Object value : meta) {
+                            if (value instanceof String) {
+                                String string = (String) value;
+                                commandBlock.setCommand(string);
+                                commandBlock.update();
                             }
-                        }, blockLocation);
+                        }
                     }
                     return false;
                 }
@@ -335,45 +326,39 @@ public class RollbackBlockHandler extends Queue {
                         updateBlockCount(finalUserString, 1);
                     }
 
-                    final Location blockLocation = block.getLocation();
-                    final Material finalRowType = rowType;
-                    final int finalRowData = rowData;
-                    Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                        block.setType(finalRowType, false);
-                        Door door = (Door) block.getBlockData();
-                        int data = finalRowData;
-                        if (data >= 8) {
-                            door.setHalf(Half.TOP);
-                            data = data - 8;
-                        }
-                        else {
-                            door.setHalf(Half.BOTTOM);
-                        }
-                        if (data >= 4) {
-                            door.setHinge(Hinge.RIGHT);
-                            data = data - 4;
-                        }
-                        else {
-                            door.setHinge(Hinge.LEFT);
-                        }
-                        BlockFace face = BlockFace.NORTH;
+                    block.setType(rowType, false);
+                    Door door = (Door) block.getBlockData();
+                    if (rowData >= 8) {
+                        door.setHalf(Half.TOP);
+                        rowData = rowData - 8;
+                    }
+                    else {
+                        door.setHalf(Half.BOTTOM);
+                    }
+                    if (rowData >= 4) {
+                        door.setHinge(Hinge.RIGHT);
+                        rowData = rowData - 4;
+                    }
+                    else {
+                        door.setHinge(Hinge.LEFT);
+                    }
+                    BlockFace face = BlockFace.NORTH;
 
-                        switch (data) {
-                            case 0:
-                                face = BlockFace.EAST;
-                                break;
-                            case 1:
-                                face = BlockFace.SOUTH;
-                                break;
-                            case 2:
-                                face = BlockFace.WEST;
-                                break;
-                        }
+                    switch (rowData) {
+                        case 0:
+                            face = BlockFace.EAST;
+                            break;
+                        case 1:
+                            face = BlockFace.SOUTH;
+                            break;
+                        case 2:
+                            face = BlockFace.WEST;
+                            break;
+                    }
 
-                        door.setFacing(face);
-                        door.setOpen(false);
-                        block.setBlockData(door, false);
-                    }, blockLocation);
+                    door.setFacing(face);
+                    door.setOpen(false);
+                    block.setBlockData(door, false);
                     return false;
                 }
                 else if (blockData == null && rowData > 0 && (rowType.name().endsWith("_BED"))) {
@@ -381,35 +366,29 @@ public class RollbackBlockHandler extends Queue {
                         updateBlockCount(finalUserString, 1);
                     }
 
-                    final Location blockLocation = block.getLocation();
-                    final Material finalRowType = rowType;
-                    final int finalRowData = rowData;
-                    Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                        block.setType(finalRowType, false);
-                        Bed bed = (Bed) block.getBlockData();
-                        BlockFace face = BlockFace.NORTH;
-                        int data = finalRowData;
+                    block.setType(rowType, false);
+                    Bed bed = (Bed) block.getBlockData();
+                    BlockFace face = BlockFace.NORTH;
 
-                        if (data > 4) {
-                            bed.setPart(Part.HEAD);
-                            data = data - 4;
-                        }
+                    if (rowData > 4) {
+                        bed.setPart(Part.HEAD);
+                        rowData = rowData - 4;
+                    }
 
-                        switch (data) {
-                            case 2:
-                                face = BlockFace.WEST;
-                                break;
-                            case 3:
-                                face = BlockFace.EAST;
-                                break;
-                            case 4:
-                                face = BlockFace.SOUTH;
-                                break;
-                        }
+                    switch (rowData) {
+                        case 2:
+                            face = BlockFace.WEST;
+                            break;
+                        case 3:
+                            face = BlockFace.EAST;
+                            break;
+                        case 4:
+                            face = BlockFace.SOUTH;
+                            break;
+                    }
 
-                        bed.setFacing(face);
-                        block.setBlockData(bed, false);
-                    }, blockLocation);
+                    bed.setFacing(face);
+                    block.setBlockData(bed, false);
                     return false;
                 }
                 else if (rowType.name().endsWith("_BANNER")) {
@@ -419,54 +398,40 @@ public class RollbackBlockHandler extends Queue {
                     }
 
                     if (meta != null) {
-                        final Location blockLocation = block.getLocation();
-                        Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                            Banner banner = (Banner) block.getState();
+                        Banner banner = (Banner) block.getState();
 
-                            for (Object value : meta) {
-                                if (value instanceof DyeColor) {
-                                    banner.setBaseColor((DyeColor) value);
-                                }
-                                else if (value instanceof Map) {
-                                    @SuppressWarnings("unchecked")
-                                    Pattern pattern = new Pattern((Map<String, Object>) value);
-                                    banner.addPattern(pattern);
-                                }
+                        for (Object value : meta) {
+                            if (value instanceof DyeColor) {
+                                banner.setBaseColor((DyeColor) value);
                             }
+                            else if (value instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Pattern pattern = new Pattern((Map<String, Object>) value);
+                                banner.addPattern(pattern);
+                            }
+                        }
 
-                            banner.update();
-                        }, blockLocation);
+                        banner.update();
                     }
                     return false;
                 }
                 else if (rowType != changeType && (BlockGroup.CONTAINERS.contains(rowType) || BlockGroup.CONTAINERS.contains(changeType))) {
-                    final Location blockLocation = block.getLocation();
-                    final Material finalRowType = rowType;
-                    final BlockData finalBlockData = blockData;
-                    final boolean finalCountBlock = countBlock;
-                    final String finalUserStringCopy = finalUserString;
-                    final boolean isChest = (finalBlockData instanceof Chest);
+                    block.setType(Material.AIR); // Clear existing container to prevent errors
 
-                    Runnable containerTask = () -> {
-                        block.setType(Material.AIR, false);
-                        block.setBlockData(finalBlockData, isChest);
-                        if (isChest) {
-                            ChestTool.updateDoubleChest(block, finalBlockData, false);
-                        }
-                        if (finalCountBlock) {
-                            updateBlockCount(finalUserStringCopy, 1);
-                        }
-                    };
+                    boolean isChest = (blockData instanceof Chest);
+                    BlockUtils.prepareTypeAndData(chunkChanges, block, rowType, blockData, (isChest));
+                    if (isChest) {
+                        ChestTool.updateDoubleChest(block, blockData, false);
+                    }
 
-                    Scheduler.runTask(CoreProtect.getInstance(), containerTask, blockLocation);
-                    return false;
+                    return countBlock;
                 }
                 else if (BlockGroup.UPDATE_STATE.contains(rowType) || rowType.name().contains("CANDLE")) {
                     BlockUtils.prepareTypeAndData(chunkChanges, block, rowType, blockData, true);
                     ChestTool.updateDoubleChest(block, blockData, true);
                     return countBlock;
                 }
-                else if (rawBlockData instanceof Bisected && !(rawBlockData instanceof Stairs || rawBlockData instanceof TrapDoor)) {
+                else if (rowType != Material.AIR && rawBlockData instanceof Bisected && !(rawBlockData instanceof Stairs || rawBlockData instanceof TrapDoor)) {
                     Bisected bisected = (Bisected) rawBlockData;
                     Bisected bisectData = (Bisected) rawBlockData.clone();
                     Location bisectLocation = block.getLocation().clone();
@@ -492,7 +457,7 @@ public class RollbackBlockHandler extends Queue {
                     }
                     return false;
                 }
-                else if (rawBlockData instanceof Bed) {
+                else if (rowType != Material.AIR && rawBlockData instanceof Bed) {
                     Bed bed = (Bed) rawBlockData;
                     if (bed.getPart() == Part.FOOT) {
                         Block adjacentBlock = block.getRelative(bed.getFacing());
@@ -518,8 +483,8 @@ public class RollbackBlockHandler extends Queue {
             e.printStackTrace();
         }
 
-        if (changeBlock) {
-            if (!rowUser.isEmpty()) {
+        if ((rowType != Material.AIR) && changeBlock) {
+            if (rowUser.length() > 0) {
                 CacheHandler.lookupCache.put(rowX + "." + rowY + "." + rowZ + "." + rowWorldId, new Object[] { unixtimestamp, rowUser, rowType });
             }
         }
@@ -529,7 +494,7 @@ public class RollbackBlockHandler extends Queue {
 
     /**
      * Update the block count in the rollback hash
-     *
+     * 
      * @param userString
      *            The username for this rollback
      * @param increment
@@ -548,7 +513,7 @@ public class RollbackBlockHandler extends Queue {
 
     /**
      * Apply all pending block changes to the world
-     *
+     * 
      * @param chunkChanges
      *            Map of blocks to change
      * @param preview

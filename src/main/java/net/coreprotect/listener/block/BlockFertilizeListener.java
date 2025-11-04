@@ -67,4 +67,5 @@ public final class BlockFertilizeListener extends Queue implements Listener {
             Queue.queueBlockPlace(user, newBlock, newBlock.getType(), newBlock.getBlock().getState(), newBlock.getType(), -1, 0, newBlock.getBlockData().getAsString());
         }
     }
+
 }
