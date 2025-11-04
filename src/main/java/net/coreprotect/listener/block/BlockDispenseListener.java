@@ -58,7 +58,7 @@ public final class BlockDispenseListener extends Queue implements Listener {
                         forceItem = true; // droppers always drop items
                     }
 
-                    ItemStack[] inventory = ((InventoryHolder) block.getState()).getInventory().getContents();
+                    ItemStack[] inventory = ((InventoryHolder) block.getState()).getInventory().getStorageContents();
                     if (forceItem) {
                         inventory = Arrays.copyOf(inventory, inventory.length + 1);
                         inventory[inventory.length - 1] = item;
@@ -83,9 +83,7 @@ public final class BlockDispenseListener extends Queue implements Listener {
                 }
 
                 if (!dispenseSuccess && material == Material.BONE_MEAL) {
-                    Location location = newBlock.getLocation();
-                    String key = location.getWorld().getName() + ":" + location.getBlockX() + ":" + location.getBlockY() + ":" + location.getBlockZ();
-                    CacheHandler.redstoneCache.put(key, new Object[] { System.currentTimeMillis(), user });
+                    CacheHandler.redstoneCache.put(newBlock.getLocation(), new Object[] { System.currentTimeMillis(), user });
                 }
 
                 if (type == Material.FIRE && (!Config.getConfig(world).BLOCK_IGNITE || !(newBlockData instanceof Lightable))) {
