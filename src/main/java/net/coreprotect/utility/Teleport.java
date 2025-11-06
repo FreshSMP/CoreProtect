@@ -1,7 +1,7 @@
 package net.coreprotect.utility;
 
-import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,7 +18,6 @@ import net.coreprotect.language.Phrase;
 import net.coreprotect.model.BlockGroup;
 import net.coreprotect.paper.PaperAdapter;
 import net.coreprotect.thread.Scheduler;
-import net.coreprotect.utility.BlockUtils;
 
 public class Teleport {
 
@@ -30,7 +29,7 @@ public class Teleport {
 
     public static void performSafeTeleport(Player player, Location location, boolean enforceTeleport) {
         try {
-            Set<Material> unsafeBlocks = new HashSet<>(Arrays.asList(Material.LAVA));
+            Set<Material> unsafeBlocks = new HashSet<>(List.of(Material.LAVA));
             unsafeBlocks.addAll(BlockGroup.FIRE);
 
             int worldHeight = location.getWorld().getMaxHeight();

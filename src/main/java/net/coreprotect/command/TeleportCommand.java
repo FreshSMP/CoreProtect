@@ -103,11 +103,9 @@ public class TeleportCommand {
         location.setZ(Double.parseDouble(z));
 
         if (ConfigHandler.isFolia) {
-            CoreProtect.getInstance().getServer().getRegionScheduler().run(CoreProtect.getInstance(), location, task -> {
-                location.getWorld().getChunkAtAsync(location).thenAccept(chunk -> {
-                    Teleport.performSafeTeleport(((Player) player), location, true);
-                });
-            });
+            CoreProtect.getInstance().getServer().getRegionScheduler().run(CoreProtect.getInstance(), location, task ->
+                location.getWorld().getChunkAtAsync(location).thenAccept(chunk ->
+                    Teleport.performSafeTeleport(((Player) player), location, true)));
         }
         else {
             int chunkX = location.getBlockX() >> 4;
