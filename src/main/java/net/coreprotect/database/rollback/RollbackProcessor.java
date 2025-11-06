@@ -458,7 +458,7 @@ public class RollbackProcessor {
                     int chunkZ = playerLocation.getBlockZ() >> 4;
 
                     if (bukkitRollbackWorld.getName().equals(playerWorld) && chunkX == finalChunkX && chunkZ == finalChunkZ) {
-                        Teleport.performSafeTeleport(player, playerLocation, false);
+                        Scheduler.runTask(CoreProtect.getInstance(), () -> Teleport.performSafeTeleport(player, playerLocation, false), player);
                     }
                 }
             }
