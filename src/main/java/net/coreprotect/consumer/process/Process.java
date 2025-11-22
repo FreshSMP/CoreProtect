@@ -15,6 +15,7 @@ import net.coreprotect.config.ConfigHandler;
 import net.coreprotect.consumer.Consumer;
 import net.coreprotect.database.Database;
 import net.coreprotect.database.statement.UserStatement;
+import net.coreprotect.utility.SyntheticUsernames;
 
 public class Process {
 
