@@ -112,7 +112,7 @@ public class TeleportCommand {
             int chunkZ = location.getBlockZ() >> 4;
             Scheduler.runTask(CoreProtect.getInstance(), () -> {
                 if (!location.getWorld().isChunkLoaded(chunkX, chunkZ)) {
-                    location.getWorld().getChunkAt(location);
+                    location.getWorld().getChunkAtAsync(location);
                 }
                 Teleport.performSafeTeleport(((Player) player), location, true);
             }, location);

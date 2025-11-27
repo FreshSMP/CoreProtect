@@ -87,7 +87,7 @@ public class RollbackProcessor {
         else {
             try {
                 if (!bukkitRollbackWorld.isChunkLoaded(finalChunkX, finalChunkZ)) {
-                    bukkitRollbackWorld.getChunkAt(finalChunkX, finalChunkZ);
+                    bukkitRollbackWorld.getChunkAtAsync(finalChunkX, finalChunkZ);
                 }
                 boolean result = processChunkLogic(finalChunkX, finalChunkZ, chunkKey, blockList, itemList, rollbackType, preview, finalUserString, finalUser, bukkitRollbackWorld, inventoryRollback);
                 return CompletableFuture.completedFuture(result);

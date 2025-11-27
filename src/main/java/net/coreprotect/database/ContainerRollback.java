@@ -61,7 +61,7 @@ public class ContainerRollback extends Rollback {
                     Block block = location.getBlock();
 
                     if (!block.getWorld().isChunkLoaded(block.getChunk())) {
-                        block.getWorld().getChunkAt(block.getLocation());
+                        block.getWorld().getChunkAtAsync(block.getLocation());
                     }
                     Object container = null;
                     Material type = block.getType();

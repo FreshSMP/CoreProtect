@@ -59,8 +59,19 @@ public class RollbackEntityHandler {
         }
 
         if (ConfigHandler.isFolia) {
-            CompletableFuture<Integer> future = bukkitWorld.getChunkAtAsync(rowX >> 4, rowZ >> 4, true).thenApply(chunk ->
-                processEntityLogic(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUserId, rowUser, bukkitWorld));
+            Location location = new Location(bukkitWorld, rowX, rowY, rowZ);
+            CompletableFuture<Integer> future = new CompletableFuture<>();
+
+            Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                try {
+                    int result = processEntityLogic(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUserId, rowUser, bukkitWorld);
+                    future.complete(result);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    future.complete(0);
+                }
+            }, location);
+
             try {
                 return future.get(10, TimeUnit.SECONDS);
             }
@@ -71,7 +82,7 @@ public class RollbackEntityHandler {
         }
         else {
             if (!bukkitWorld.isChunkLoaded(rowX >> 4, rowZ >> 4)) {
-                bukkitWorld.getChunkAt(rowX >> 4, rowZ >> 4);
+                bukkitWorld.getChunkAtAsync(rowX >> 4, rowZ >> 4);
             }
             return processEntityLogic(row, rollbackType, finalUserString, oldTypeRaw, rowTypeRaw, rowData, rowAction, rowRolledBack, rowX, rowY, rowZ, rowWorldId, rowUserId, rowUser, bukkitWorld);
         }
@@ -95,7 +106,6 @@ public class RollbackEntityHandler {
                 else if (rowTypeRaw <= 0) {
                     // Attempt to remove entity
                     if (rowRolledBack == 1) {
-                        boolean removed = false;
                         int entityId;
                         String entityName = EntityUtils.getEntityType(oldTypeRaw).name();
                         String token = rowX + "." + rowY + "." + rowZ + "." + rowWorldId + "." + entityName;
@@ -114,45 +124,55 @@ public class RollbackEntityHandler {
                         int zmin = rowZ - 5;
                         int zmax = rowZ + 5;
 
+                        EntityType targetType = EntityUtils.getEntityType(oldTypeRaw);
+                        final int cachedEntityId = entityId;
+
                         for (Entity entity : block.getChunk().getEntities()) {
                             Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                                if (entityId > -1) {
-                                    if (entity.getEntityId() == entityId) {
-                                        updateEntityCount(finalUserString, 1);
-                                        entity.remove();
-                                    }
-                                } else {
-                                    if (entity.getType().equals(EntityUtils.getEntityType(oldTypeRaw))) {
-                                        Location entityLocation = entity.getLocation();
-                                        int entityx = entityLocation.getBlockX();
-                                        int entityY = entityLocation.getBlockY();
-                                        int entityZ = entityLocation.getBlockZ();
-
-                                        if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
+                                try {
+                                    if (cachedEntityId > -1) {
+                                        if (entity.getEntityId() == cachedEntityId) {
                                             updateEntityCount(finalUserString, 1);
                                             entity.remove();
                                         }
+                                    } else {
+                                        if (entity.getType().equals(targetType)) {
+                                            Location entityLocation = entity.getLocation();
+                                            int entityx = entityLocation.getBlockX();
+                                            int entityY = entityLocation.getBlockY();
+                                            int entityZ = entityLocation.getBlockZ();
+
+                                            if (entityx >= xmin && entityx <= xmax && entityY >= ymin && entityY <= ymax && entityZ >= zmin && entityZ <= zmax) {
+                                                updateEntityCount(finalUserString, 1);
+                                                entity.remove();
+                                            }
+                                        }
                                     }
+                                } catch (Exception e) {
+                                    // Entity may have been removed or moved to different region
                                 }
                             }, entity);
                         }
 
-                        if (!removed && entityId > -1) {
+                        // For searching all living entities, we need to be more careful
+                        // Only search if we have a specific entity ID to find
+                        if (cachedEntityId > -1) {
                             for (Entity entity : block.getWorld().getLivingEntities()) {
-                                if (entity.getEntityId() == entityId) {
-                                    Scheduler.runTask(CoreProtect.getInstance(), () -> {
-                                        updateEntityCount(finalUserString, 1);
-                                        entity.remove();
-                                    }, entity);
-                                    break;
-                                }
+                                // Schedule the check on the entity's owning thread
+                                Scheduler.runTask(CoreProtect.getInstance(), () -> {
+                                    try {
+                                        if (entity.getEntityId() == cachedEntityId) {
+                                            updateEntityCount(finalUserString, 1);
+                                            entity.remove();
+                                        }
+                                    } catch (Exception e) {
+                                        // Entity may have been removed or moved to different region
+                                    }
+                                }, entity);
                             }
-                            removed = true;
                         }
 
-                        if (removed) {
-                            return 1;
-                        }
+                        return 1;
                     }
                 }
             }
