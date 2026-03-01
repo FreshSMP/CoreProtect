@@ -31,6 +31,7 @@ import net.coreprotect.bukkit.BukkitAdapter;
 import net.coreprotect.config.Config;
 import net.coreprotect.config.ConfigHandler;
 import net.coreprotect.listener.player.InventoryChangeListener;
+import net.coreprotect.thread.Scheduler;
 import net.coreprotect.utility.ItemUtils;
 
 public final class CopperGolemChestListener implements Listener {
